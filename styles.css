@@ -1,22 +1,4 @@
 :root {
-    /* Light mode colors */
-    --gray-1: #fcfcfc;
-    --gray-2: #f9f9f9;
-    --gray-3: #f0f0f0;
-    --gray-4: #e8e8e8;
-    --gray-5: #e0e0e0;
-    --gray-6: #d9d9d9;
-    --gray-7: #cecece;
-    --gray-8: #bbbbbb;
-    --gray-9: #8d8d8d;
-    --gray-10: #838383;
-    --gray-11: #646464;
-    --gray-12: #202020;
-    
-    --slate-10: #475569;
-    --slate-12: #0f172a;
-    
-    --bg-primary: #15803d;
     --bg-card: rgba(255, 255, 255, 0.45);
     --bg-footer: rgba(255, 255, 255, 0.55);
     --text-primary: #000000;
@@ -42,22 +24,23 @@
     box-sizing: border-box;
 }
 
+html {
+    overflow-x: hidden;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Geist', 'Inter', sans-serif;
     background: url('WhatsApp Image 2026-01-23 at 12.54.47 PM.jpeg') center center / cover no-repeat fixed;
-    background-attachment: fixed;
     color: var(--text-primary);
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 0;
+    margin: 0;
     position: relative;
-    overflow-x: hidden;
     transition: color 0.3s ease;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
 }
 
 body::before {
@@ -69,8 +52,6 @@ body::before {
     height: 100%;
     background: rgba(0, 0, 0, 0.18);
     z-index: -1;
-    pointer-events: none;
-    transition: background 0.3s ease;
 }
 
 [data-theme="dark"] body::before {
@@ -87,42 +68,43 @@ body::before {
     background-image: url('WhatsApp Image 2026-01-23 at 12.54.47 PM.jpeg');
     background-size: cover;
     background-position: center;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
 }
 
 .container {
     width: 100%;
     max-width: 520px;
+    margin: 0 auto;
+    padding: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 20px 0;
+    min-height: 100vh;
 }
 
 .card {
     width: 100%;
-    max-width: 520px;
     background: var(--bg-card);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-radius: 1rem;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 
-        0 4px 6px -1px rgba(0, 0, 0, 0.1),
-        0 2px 4px -1px rgba(0, 0, 0, 0.06),
-        0 0 0 1px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     overflow: hidden;
     transition: all 0.3s ease;
 }
 
-[data-theme="dark"] .card {
-    border: 1px solid rgba(255, 255, 255, 0.18);
-}
-
 .card-content {
     padding: 20px;
+}
+
+.card-header {
+    padding: 2rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-body {
+    padding: 2rem;
 }
 
 .headline {
@@ -134,9 +116,6 @@ body::before {
     margin-bottom: 12px;
     line-height: 1.4;
     letter-spacing: -0.02em;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     min-height: 2.8rem;
 }
 
@@ -151,19 +130,13 @@ body::before {
 }
 
 @keyframes blink-terminal {
-    0%, 50% {
-        opacity: 1;
-    }
-    51%, 100% {
-        opacity: 0;
-    }
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
 }
 
 [data-theme="dark"] .headline {
     color: #ffffff;
-    text-shadow:
-        0 1px 0 rgba(0, 0, 0, 0.85),
-        0 6px 20px rgba(0, 0, 0, 0.55);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85), 0 6px 20px rgba(0, 0, 0, 0.55);
 }
 
 .description {
@@ -173,9 +146,6 @@ body::before {
     text-align: center;
     margin-bottom: 16px;
     letter-spacing: -0.01em;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-weight: 400;
 }
 
@@ -186,9 +156,6 @@ body::before {
     text-align: center;
     margin-bottom: 24px;
     letter-spacing: -0.01em;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-weight: 500;
 }
 
@@ -232,9 +199,6 @@ body::before {
     outline: none;
     font-family: inherit;
     letter-spacing: -0.01em;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-weight: 400;
 }
 
@@ -272,7 +236,6 @@ body::before {
 .search-button:hover:not(:disabled) {
     transform: scale(1.02);
     filter: brightness(1.04);
-    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.22);
 }
 
 .search-button:active:not(:disabled) {
@@ -305,9 +268,7 @@ body::before {
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
 .card-footer {
@@ -323,9 +284,6 @@ body::before {
 .footer-text {
     color: var(--text-secondary);
     letter-spacing: -0.01em;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-weight: 500;
 }
 
@@ -335,9 +293,6 @@ body::before {
     text-underline-offset: 2px;
     transition: color 0.2s ease;
     letter-spacing: -0.01em;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-weight: 500;
     cursor: pointer;
 }
@@ -356,9 +311,6 @@ body::before {
     padding: 4px 8px;
     transition: color 0.2s ease;
     letter-spacing: -0.01em;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     font-weight: 500;
 }
 
@@ -366,7 +318,6 @@ body::before {
     color: var(--text-primary);
 }
 
-/* Animation for result card */
 @keyframes slideUp {
     from {
         opacity: 0;
@@ -382,7 +333,6 @@ body::before {
     animation: slideUp 0.4s ease-out;
 }
 
-/* Initial badge styling */
 .initial-badge {
     background: #111827;
     color: #ffffff;
@@ -398,7 +348,19 @@ body::before {
     color: #000000;
 }
 
-/* Bullet points for insights - WITH GLOW ANIMATION */
+.ratings-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.verdict-box {
+    border-left: 3px solid var(--text-primary);
+    padding-left: 1.5rem;
+    margin-bottom: 2rem;
+}
+
 .insight-point {
     padding: 10px 0 10px 20px;
     position: relative;
@@ -451,22 +413,23 @@ body::before {
 
 @media (max-width: 480px) {
     body {
-        padding: 10px;
+        padding: 0;
     }
     
     .container {
-        padding: 12px 0;
-        max-width: 100%;
-    }
-    
-    .card {
-        border-radius: 1rem;
-        width: 100%;
-        max-width: 100%;
+        padding: 12px;
     }
     
     .card-content {
         padding: 20px;
+    }
+    
+    .card-header {
+        padding: 1.5rem;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
     }
     
     .headline {
@@ -478,32 +441,13 @@ body::before {
         font-size: 12px;
     }
     
-    .background-mesh {
-        background-attachment: scroll;
-    }
-    
-    body {
-        background-attachment: scroll;
+    .ratings-grid {
+        gap: 0.75rem;
     }
 }
 
-@media (min-width: 481px) and (max-width: 768px) {
+@media (min-width: 481px) {
     .container {
-        max-width: 520px;
-        padding: 16px 0;
-    }
-    
-    .card {
-        max-width: 520px;
-    }
-}
-
-@media (min-width: 769px) {
-    .container {
-        max-width: 520px;
-    }
-    
-    .card {
-        max-width: 520px;
+        padding: 16px;
     }
 }

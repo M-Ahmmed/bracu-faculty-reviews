@@ -18,7 +18,7 @@ const themeSwitcher = document.getElementById('themeSwitcher');
 const themeText = document.getElementById('themeText');
 
 // ============================================
-// 3. THEME SWITCHER FUNCTIONALITY
+// 3. THEME SWITCHER FUNCTIONALITY - DARK MODE DEFAULT
 // ============================================
 const currentTheme = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', currentTheme);
@@ -68,7 +68,6 @@ async function loadFacultyData() {
         
         allFaculty = data || [];
         
-        // Extract full names and initials from faculty_reviews field
         const searchableData = allFaculty.map(faculty => {
             if (faculty.faculty_reviews) {
                 const parts = faculty.faculty_reviews.split('|');
@@ -90,7 +89,6 @@ async function loadFacultyData() {
             };
         });
         
-        // Initialize Fuse.js with multiple search keys
         fuse = new Fuse(searchableData, {
             keys: [
                 { name: 'fullName', weight: 0.5 },
@@ -129,7 +127,6 @@ searchForm.addEventListener('submit', async (e) => {
     try {
         let faculty = null;
         
-        // First, try fuzzy search using Fuse.js
         if (fuse && allFaculty.length > 0) {
             const fuseResults = fuse.search(userInput);
             
@@ -139,7 +136,6 @@ searchForm.addEventListener('submit', async (e) => {
             }
         }
         
-        // If fuzzy search fails, try exact database match
         if (!faculty) {
             const { data: exactMatch, error } = await _supabase
                 .from('faculty_reviews')
@@ -226,9 +222,9 @@ function displayFaculty(faculty) {
 
     resultArea.innerHTML = `
         <div class="card slide-up">
-            <div class="card-header" style="padding: 2rem; border-bottom: 1px solid var(--border-color);">
+            <div class="card-header">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <h2 class="faculty-name" style="margin: 0; font-size: 1.5rem; color: var(--text-primary); flex: 1; min-width: 200px;">
+                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); flex: 1; min-width: 200px;">
                         ${escapeHtml(fullName)}
                     </h2>
                     ${initial ? `<span class="initial-badge">${escapeHtml(initial)}</span>` : ''}
@@ -236,34 +232,34 @@ function displayFaculty(faculty) {
                 ${email ? `<a href="mailto:${escapeHtml(email)}" style="color: var(--text-primary); font-size: 0.875rem; text-decoration: none; display: block; margin-bottom: 1rem; opacity: 0.8; transition: opacity 0.2s; word-break: break-word;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">${escapeHtml(email)}</a>` : ''}
                 ${courseArray.length > 0 ? `<div style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">${courseTags}</div>` : ''}
             </div>
-            <div class="card-body" style="padding: 2rem;">
-                <div class="ratings-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
-                    <div class="rating-box" style="background: var(--input-bg); padding: 1rem; text-align: center; border-radius: 8px;">
+            <div class="card-body">
+                <div class="ratings-grid">
+                    <div style="background: var(--input-bg); padding: 1rem; text-align: center; border-radius: 8px;">
                         <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Teaching</span>
                         <span style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">${escapeHtml(teaching)}</span>
                     </div>
-                    <div class="rating-box" style="background: var(--input-bg); padding: 1rem; text-align: center; border-radius: 8px;">
+                    <div style="background: var(--input-bg); padding: 1rem; text-align: center; border-radius: 8px;">
                         <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Marking</span>
                         <span style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">${escapeHtml(marking)}</span>
                     </div>
-                    <div class="rating-box" style="background: var(--input-bg); padding: 1rem; text-align: center; border-radius: 8px;">
+                    <div style="background: var(--input-bg); padding: 1rem; text-align: center; border-radius: 8px;">
                         <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Behavior</span>
                         <span style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">${escapeHtml(behavior)}</span>
                     </div>
                 </div>
                 
-                <div class="verdict-box" style="border-left: 3px solid var(--text-primary); padding-left: 1.5rem; margin-bottom: 2rem;">
+                <div class="verdict-box">
                     <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; font-weight: 600; letter-spacing: 0.5px;">Overall Review</span>
                     <p style="margin: 0; line-height: 1.6; color: var(--text-primary); font-size: 0.95rem; font-weight: 400;">${escapeHtml(overallSummary)}</p>
                 </div>
 
-                <div class="details-box">
+                <div>
                     <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1rem; font-weight: 600; letter-spacing: 0.5px;">Students Insight</span>
                     ${parseInsights(statisticalInsights)}
                 </div>
             </div>
             
-            <div class="card-footer" style="border-top: 1px solid var(--border-color);">
+            <div class="card-footer">
                 <span class="footer-link" onclick="toggleAboutCard()">About this data</span>
             </div>
         </div>
@@ -327,10 +323,10 @@ function renderAboutCard() {
     
     aboutArea.innerHTML = `
         <div class="card slide-up">
-            <div class="card-header" style="padding: 2rem; border-bottom: 1px solid var(--border-color);">
+            <div class="card-header">
                 <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); font-weight: 700; letter-spacing: -0.02em;">About this data</h2>
             </div>
-            <div class="card-body" style="padding: 2rem;">
+            <div class="card-body">
                 <p style="margin: 0 0 1.5rem 0; color: var(--text-primary); font-size: 0.95rem; line-height: 1.7; font-weight: 400;">
                     The BRACU Faculty & Course Review group is a goldmine of information, but finding actual reviews means scrolling through memes, jokes, and off-topic chaos.
                 </p>
@@ -364,7 +360,7 @@ function renderAboutCard() {
                 </div>
             </div>
             
-            <div class="card-footer" style="border-top: 1px solid var(--border-color);">
+            <div class="card-footer">
                 <span class="footer-link" onclick="closeAboutCard()">Close</span>
             </div>
         </div>
