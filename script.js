@@ -260,7 +260,7 @@ function displayFaculty(faculty) {
             </div>
             
             <div class="card-footer">
-                <span class="footer-link" onclick="toggleAboutCard()">About this data</span>
+                <span class="footer-link" onclick="toggleAboutCard()">Disclaimer & Data Notice</span>
             </div>
         </div>
     `;
@@ -324,31 +324,36 @@ function renderAboutCard() {
     aboutArea.innerHTML = `
         <div class="card slide-up">
             <div class="card-header">
-                <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); font-weight: 700; letter-spacing: -0.02em;">About this data</h2>
+                <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); font-weight: 700; letter-spacing: -0.02em;">Disclaimer & Data Notice</h2>
             </div>
             <div class="card-body">
                 <p style="margin: 0 0 1.5rem 0; color: var(--text-primary); font-size: 0.95rem; line-height: 1.7; font-weight: 400;">
-                    The BRACU Faculty & Course Review group is a goldmine of information, but finding actual reviews means scrolling through memes, jokes, and off-topic chaos.
+                    This project is an independent, student-built tool created to help students quickly understand general patterns in faculty reviews shared within the BRACU Faculty & Course Review Facebook group.
                 </p>
                 
                 <div style="margin-bottom: 2rem;">
-                    <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; letter-spacing: 0.3px;">Here's what I did:</h3>
+                    <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; letter-spacing: 0.3px;">All information presented here is:</h3>
                     <ul style="margin-left: 1.25rem; color: var(--text-primary); font-size: 0.95rem; line-height: 1.8;">
-                        <li style="margin-bottom: 0.5rem;">Searched the group for each faculty</li>
-                        <li style="margin-bottom: 0.5rem;">Collected recent posts with real reviews</li>
-                        <li style="margin-bottom: 0.5rem;">Filtered out memes and noise</li>
-                        <li style="margin-bottom: 0.5rem;">Used AI to summarize what students actually said</li>
+                        <li style="margin-bottom: 0.5rem;">Aggregated and summarized</li>
+                        <li style="margin-bottom: 0.5rem;">Based on publicly available student discussions</li>
+                        <li style="margin-bottom: 0.5rem;">Non-official and non-authoritative</li>
                     </ul>
                 </div>
                 
-                <p style="margin: 0 0 1.5rem 0; color: var(--text-primary); font-size: 0.95rem; line-height: 1.7; font-weight: 400;">
-                    So you get the consensus in 10 seconds instead of 2 hours.
-                </p>
+             
                 
                 <div style="margin-bottom: 2rem;">
-                    <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; letter-spacing: 0.3px;">Is this official?</h3>
+                   <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; letter-spacing: 0.3px;">Important context:</h3>
                     <p style="margin: 0; color: var(--text-primary); font-size: 0.95rem; line-height: 1.7; font-weight: 400;">
-                        Nope. This is real student feedback from Facebook, just organized and summarized. Take it as one input for your decisions, not the only one.
+                        This platform does not represent BRAC University, any department, or any faculty member.
+
+The content does not claim to be complete, factual evaluations, or official reviews. It reflects subjective student opinions, summarized to highlight common themes rather than individual statements.
+
+This platform is not intended to defame, rank, or judge individuals. Any resemblance to performance evaluation systems is unintentional.
+
+If any information appears inaccurate, outdated, or inappropriate, it can be reviewed, corrected, or removed upon request.
+
+This project is provided for informational purposes only, and users are encouraged to verify information independently and use personal judgment.
                     </p>
                 </div>
                 
