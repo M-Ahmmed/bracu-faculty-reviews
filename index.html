@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Reviews</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+</head>
+<body>
+    <div class="background-mesh"></div>
+    
+    <div class="container">
+        <div class="card" id="mainLandingCard">
+            <div class="card-content">
+                <h1 class="headline" id="typewriterText"></h1>
+                
+                <p class="description">
+                   The "BRACU Faculty & Course Review" group is a mess. So I scraped 1,500+ reviews into a single search bar.
+No distraction. No chaos. Just the actual data you need.
+                </p>
+                
+                <div class="source-line">
+                    <span>Source: 1,500+ raw Facebook reviews.</span>
+                    <span class="separator">|</span>
+                    <span>Last Update: January 2026.</span>
+                    <span class="separator">|</span>
+                    <span>Methodology: AI-summarized.</span>
+                </div>
+                
+                <form class="search-form" id="searchForm">
+                    <div class="search-input-wrapper">
+                        <input 
+                            type="text" 
+                            class="search-input" 
+                            placeholder="Search faculty name..."
+                            id="searchInput"
+                            autocomplete="off"
+                        />
+                        <button type="submit" class="search-button" id="searchButton">
+                            <span class="button-text">Search</span>
+                            <span class="spinner" id="spinner"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="card-footer">
+                <div>
+                    <span class="footer-text">Built by Mueen</span>
+                    <span class="separator">|</span>
+                    <a href="https://www.facebook.com/mueen.ahmmed.7" target="_blank" class="footer-link">Send me feedback 💬</a>
+                </div>
+                <button class="theme-switcher" id="themeSwitcher">
+                    <span class="theme-text" id="themeText">Dark</span>
+                </button>
+            </div>
+        </div>
+        
+        <div id="resultArea" style="display: none; margin-top: 32px;"></div>
+        
+        <div id="aboutArea" style="display: none; margin-top: 32px;"></div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
