@@ -20,7 +20,7 @@ const themeText = document.getElementById('themeText');
 // ============================================
 // 3. THEME SWITCHER FUNCTIONALITY
 // ============================================
-const currentTheme = localStorage.getItem('theme') || 'light';
+const currentTheme = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', currentTheme);
 themeText.textContent = currentTheme === 'dark' ? 'Light' : 'Dark';
 
@@ -155,7 +155,7 @@ searchForm.addEventListener('submit', async (e) => {
 
         if (!faculty) {
             resultArea.innerHTML = `
-                <div class="card slide-up" style="margin-top: 2rem;">
+                <div class="card slide-up">
                     <div class="card-content" style="padding: 2rem; text-align: center;">
                         <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">No Results Found</h3>
                         <p style="color: var(--text-secondary);">
@@ -167,14 +167,23 @@ searchForm.addEventListener('submit', async (e) => {
                 </div>
             `;
             resultArea.style.display = 'block';
-            resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-            renderFacultyCard(faculty);
+            return;
         }
 
+        displayFaculty(faculty);
     } catch (err) {
-        console.error('Search error:', err);
-        alert("Something went wrong. Please check your Supabase connection and try again.");
+        console.error('Error searching faculty:', err);
+        resultArea.innerHTML = `
+            <div class="card slide-up">
+                <div class="card-content" style="padding: 2rem; text-align: center;">
+                    <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">Error</h3>
+                    <p style="color: var(--text-secondary);">
+                        Something went wrong. Please try again.
+                    </p>
+                </div>
+            </div>
+        `;
+        resultArea.style.display = 'block';
     } finally {
         searchButton.disabled = false;
         searchButton.classList.remove('loading');
@@ -182,9 +191,9 @@ searchForm.addEventListener('submit', async (e) => {
 });
 
 // ============================================
-// 6. RENDER FACULTY CARD
+// 6. DISPLAY FACULTY RESULTS
 // ============================================
-function renderFacultyCard(faculty) {
+function displayFaculty(faculty) {
     let fullName, initial, email, courses, teaching, marking, behavior, overallSummary, statisticalInsights;
     
     if (faculty.faculty_reviews) {
@@ -216,7 +225,7 @@ function renderFacultyCard(faculty) {
     ).join('');
 
     resultArea.innerHTML = `
-        <div class="card slide-up" style="margin-top: 2rem; max-width: 520px; width: 100%;">
+        <div class="card slide-up">
             <div class="card-header" style="padding: 2rem; border-bottom: 1px solid var(--border-color);">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
                     <h2 class="faculty-name" style="margin: 0; font-size: 1.5rem; color: var(--text-primary); flex: 1; min-width: 200px;">
@@ -317,7 +326,7 @@ function renderAboutCard() {
     const aboutArea = document.getElementById('aboutArea');
     
     aboutArea.innerHTML = `
-        <div class="card slide-up" style="margin-top: 2rem; max-width: 520px; width: 100%;">
+        <div class="card slide-up">
             <div class="card-header" style="padding: 2rem; border-bottom: 1px solid var(--border-color);">
                 <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); font-weight: 700; letter-spacing: -0.02em;">About this data</h2>
             </div>
