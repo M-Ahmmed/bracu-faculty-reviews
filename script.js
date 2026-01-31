@@ -254,7 +254,7 @@ function displayFaculty(faculty) {
                 </div>
 
                 <div>
-                    <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1rem; font-weight: 600; letter-spacing: 0.5px;">Students Insight</span>
+                    <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1rem; font-weight: 600; letter-spacing: 0.5px;">What Students Say</span>
                     ${parseInsights(statisticalInsights)}
                 </div>
             </div>
