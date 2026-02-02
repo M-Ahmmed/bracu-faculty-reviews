@@ -37,7 +37,7 @@ themeSwitcher.addEventListener('click', () => {
 // 3.5 TYPEWRITER ANIMATION
 // ============================================
 const typewriterText = document.getElementById('typewriterText');
-const text = "Find your faculty review in 10 seconds";
+const text = "Find your faculty review";
 let charIndex = 0;
 
 function typeWriter() {
