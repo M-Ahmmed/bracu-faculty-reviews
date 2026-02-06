@@ -102,7 +102,7 @@ body::before {
     border-radius: 1rem;
     border: 1px solid var(--border-color);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    overflow: hidden;
+    overflow: visible; /* CRITICAL FIX: Changed from hidden to visible */
     transition: all 0.3s ease;
 }
 
@@ -497,29 +497,46 @@ body::before {
 
 .search-input-wrapper {
     position: relative;
+    overflow: visible; /* CRITICAL FIX: Allow dropdown to escape */
+}
+
+.card {
+    overflow: visible; /* CRITICAL FIX: Allow dropdown to escape card boundaries */
 }
 
 .suggestions-dropdown {
     position: absolute;
-    top: calc(100% + 8px);
+    top: 100%;
     left: 0;
     right: 0;
+    margin-top: 8px;
     background: var(--bg-card);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     border: 1px solid var(--border-color);
     border-radius: 12px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2), 
+                0 6px 12px rgba(0, 0, 0, 0.15),
+                0 0 0 1px rgba(255, 255, 255, 0.05);
     overflow: hidden;
     display: none;
-    z-index: 1000;
-    animation: dropdownSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 9999;
+    animation: dropdownSlide 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 320px;
+    overflow-y: auto;
+    min-width: 100%;
+}
+
+[data-theme="dark"] .suggestions-dropdown {
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 
+                0 6px 12px rgba(0, 0, 0, 0.35),
+                0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 @keyframes dropdownSlide {
     from {
         opacity: 0;
-        transform: translateY(-8px);
+        transform: translateY(-10px);
     }
     to {
         opacity: 1;
@@ -531,22 +548,43 @@ body::before {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: 14px 16px;
+    min-height: 48px; /* Ensures easy tap targets on mobile */
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     border-bottom: 1px solid var(--border-color);
+    position: relative;
+    background: transparent;
 }
 
 .suggestion-item:last-child {
     border-bottom: none;
 }
 
+.suggestion-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--text-primary);
+    transform: scaleY(0);
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .suggestion-item:hover {
     background: var(--input-bg);
+    padding-left: 20px;
+}
+
+.suggestion-item:hover::before {
+    transform: scaleY(1);
 }
 
 .suggestion-item:active {
     transform: scale(0.98);
+    background: var(--border-color);
 }
 
 .suggestion-name {
@@ -555,32 +593,78 @@ body::before {
     font-weight: 500;
     color: var(--text-primary);
     letter-spacing: -0.01em;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 8px;
+}
+
+.suggestion-item:hover .suggestion-name {
+    font-weight: 600;
 }
 
 .suggestion-badge {
     background: #111827;
     color: #ffffff;
-    padding: 0.25rem 0.6rem;
+    padding: 0.3rem 0.65rem;
     border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.3px;
-    margin-left: 12px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 [data-theme="dark"] .suggestion-badge {
     background: #ffffff;
     color: #000000;
+    box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+}
+
+.suggestion-item:hover .suggestion-badge {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .suggestion-item:hover .suggestion-badge {
+    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.15);
+}
+
+/* Custom scrollbar for suggestions dropdown */
+.suggestions-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.suggestions-dropdown::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.suggestions-dropdown::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.suggestions-dropdown::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }
 
 /* Mobile responsiveness for suggestions */
 @media (max-width: 480px) {
     .suggestions-dropdown {
         border-radius: 10px;
+        margin-top: 6px;
+        max-height: 280px;
     }
     
     .suggestion-item {
-        padding: 10px 14px;
+        padding: 12px 14px;
+        min-height: 44px;
+    }
+    
+    .suggestion-item:hover {
+        padding-left: 18px;
     }
     
     .suggestion-name {
@@ -589,6 +673,6 @@ body::before {
     
     .suggestion-badge {
         font-size: 0.7rem;
-        padding: 0.2rem 0.5rem;
+        padding: 0.25rem 0.55rem;
     }
 }

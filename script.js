@@ -127,6 +127,7 @@ function createSuggestionsContainer() {
 createSuggestionsContainer();
 
 // Show suggestions based on user input
+// Show suggestions based on user input
 function showSuggestions(query) {
     if (!query || query.length < 2) {
         hideSuggestions();
@@ -138,29 +139,37 @@ function showSuggestions(query) {
     }
     
     const inputLength = query.length;
+    
+    // Apply Logic Gate: determine threshold based on input length
     const scoreThreshold = inputLength <= 6 ? 0.15 : 0.45;
     
     // Search using Fuse.js
     const results = fuse.search(query);
     
-    // Filter by score threshold and limit to 5
-    const filteredResults = results
-        .filter(result => result.score < scoreThreshold)
-        .slice(0, 5);
+    // Filter by score threshold
+    const filteredResults = results.filter(result => result.score < scoreThreshold);
     
-    if (filteredResults.length === 0) {
+    // Limit to top 5 matches
+    const topResults = filteredResults.slice(0, 5);
+    
+    if (topResults.length === 0) {
         hideSuggestions();
         return;
     }
     
-    // Build suggestions HTML
-    const suggestionsHTML = filteredResults.map(result => {
+    console.log(`Suggestions for "${query}" (${inputLength} chars, threshold: ${scoreThreshold}):`);
+    topResults.forEach((result, index) => {
+        console.log(`  ${index + 1}. ${result.item.fullName || result.item.faculty_name} - Score: ${result.score.toFixed(3)}`);
+    });
+    
+    // Build suggestions HTML as vertical list
+    const suggestionsHTML = topResults.map((result, index) => {
         const faculty = result.item;
         const fullName = faculty.fullName || faculty.faculty_name || "Unknown";
         const initial = faculty.initial || "";
         
         return `
-            <div class="suggestion-item" data-name="${escapeHtml(fullName)}">
+            <div class="suggestion-item" data-name="${escapeHtml(fullName)}" data-index="${index}">
                 <span class="suggestion-name">${escapeHtml(fullName)}</span>
                 ${initial ? `<span class="suggestion-badge">${escapeHtml(initial)}</span>` : ''}
             </div>
@@ -173,9 +182,22 @@ function showSuggestions(query) {
     // Add click event to each suggestion
     document.querySelectorAll('.suggestion-item').forEach(item => {
         item.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
             const selectedName = e.currentTarget.getAttribute('data-name');
+            const index = e.currentTarget.getAttribute('data-index');
+            
+            console.log(`✓ Suggestion clicked: "${selectedName}" (index: ${index})`);
+            
+            // Fill the search input
             searchInput.value = selectedName;
-            hideSuggestions();
+            
+            // CRITICAL: Clear dropdown immediately
+            suggestionsContainer.innerHTML = '';
+            suggestionsContainer.style.display = 'none';
+            
+            // Trigger the search
             searchForm.dispatchEvent(new Event('submit'));
         });
     });
@@ -217,6 +239,11 @@ searchInput.addEventListener('keydown', (e) => {
         hideSuggestions();
     }
 });
+
+// Hide suggestions when form is submitted
+searchForm.addEventListener('submit', () => {
+    hideSuggestions();
+}, true);
 
 // ============================================
 // 5. SEARCH FUNCTIONALITY WITH LOGIC GATE
@@ -452,7 +479,7 @@ function renderAboutCard() {
     aboutArea.innerHTML = `
         <div class="card slide-up">
             <div class="card-header">
-                <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); font-weight: 700; letter-spacing: -0.02em;">Disclaimer & Data Notice</h2>
+                <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); font-weight: 700; letter-spacing: -0.02em;">About & Data Notice</h2>
             </div>
             <div class="card-body">
                 <div style="margin-bottom: 2rem;">
