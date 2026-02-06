@@ -452,7 +452,7 @@ function renderAboutCard() {
     aboutArea.innerHTML = `
         <div class="card slide-up">
             <div class="card-header">
-                <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); font-weight: 700; letter-spacing: -0.02em;">About & Data Notice</h2>
+                <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); font-weight: 700; letter-spacing: -0.02em;">Disclaimer & Data Notice</h2>
             </div>
             <div class="card-body">
                 <div style="margin-bottom: 2rem;">
