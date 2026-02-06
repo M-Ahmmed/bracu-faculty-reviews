@@ -111,10 +111,121 @@ async function loadFacultyData() {
 loadFacultyData();
 
 // ============================================
+// 4.5 AUTOCOMPLETE SUGGESTIONS
+// ============================================
+let debounceTimer = null;
+let suggestionsContainer = null;
+
+// Create suggestions dropdown on page load
+function createSuggestionsContainer() {
+    suggestionsContainer = document.createElement('div');
+    suggestionsContainer.id = 'suggestions-dropdown';
+    suggestionsContainer.className = 'suggestions-dropdown';
+    document.querySelector('.search-input-wrapper').appendChild(suggestionsContainer);
+}
+
+createSuggestionsContainer();
+
+// Show suggestions based on user input
+function showSuggestions(query) {
+    if (!query || query.length < 2) {
+        hideSuggestions();
+        return;
+    }
+    
+    if (!fuse || allFaculty.length === 0) {
+        return;
+    }
+    
+    const inputLength = query.length;
+    const scoreThreshold = inputLength <= 6 ? 0.15 : 0.45;
+    
+    // Search using Fuse.js
+    const results = fuse.search(query);
+    
+    // Filter by score threshold and limit to 5
+    const filteredResults = results
+        .filter(result => result.score < scoreThreshold)
+        .slice(0, 5);
+    
+    if (filteredResults.length === 0) {
+        hideSuggestions();
+        return;
+    }
+    
+    // Build suggestions HTML
+    const suggestionsHTML = filteredResults.map(result => {
+        const faculty = result.item;
+        const fullName = faculty.fullName || faculty.faculty_name || "Unknown";
+        const initial = faculty.initial || "";
+        
+        return `
+            <div class="suggestion-item" data-name="${escapeHtml(fullName)}">
+                <span class="suggestion-name">${escapeHtml(fullName)}</span>
+                ${initial ? `<span class="suggestion-badge">${escapeHtml(initial)}</span>` : ''}
+            </div>
+        `;
+    }).join('');
+    
+    suggestionsContainer.innerHTML = suggestionsHTML;
+    suggestionsContainer.style.display = 'block';
+    
+    // Add click event to each suggestion
+    document.querySelectorAll('.suggestion-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            const selectedName = e.currentTarget.getAttribute('data-name');
+            searchInput.value = selectedName;
+            hideSuggestions();
+            searchForm.dispatchEvent(new Event('submit'));
+        });
+    });
+}
+
+// Hide suggestions
+function hideSuggestions() {
+    if (suggestionsContainer) {
+        suggestionsContainer.style.display = 'none';
+        suggestionsContainer.innerHTML = '';
+    }
+}
+
+// Debounced input handler
+searchInput.addEventListener('input', (e) => {
+    const query = e.target.value.trim();
+    
+    // Clear previous timer
+    if (debounceTimer) {
+        clearTimeout(debounceTimer);
+    }
+    
+    // Set new timer (200ms delay)
+    debounceTimer = setTimeout(() => {
+        showSuggestions(query);
+    }, 200);
+});
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+        hideSuggestions();
+    }
+});
+
+// Hide suggestions on ESC key
+searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        hideSuggestions();
+    }
+});
+
+// ============================================
 // 5. SEARCH FUNCTIONALITY WITH LOGIC GATE
 // ============================================
 searchForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    
+    // Hide suggestions when form is submitted
+    hideSuggestions();
     
     const userInput = searchInput.value.trim();
     if (!userInput) {
