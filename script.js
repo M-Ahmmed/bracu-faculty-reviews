@@ -98,7 +98,8 @@ async function loadFacultyData() {
             threshold: 0.4,
             ignoreLocation: true,
             minMatchCharLength: 2,
-            useExtendedSearch: true
+            useExtendedSearch: true,
+            includeScore: true
         });
         
         console.log(`Loaded ${allFaculty.length} faculty records`);
@@ -110,7 +111,7 @@ async function loadFacultyData() {
 loadFacultyData();
 
 // ============================================
-// 5. SEARCH FUNCTIONALITY
+// 5. SEARCH FUNCTIONALITY WITH LOGIC GATE
 // ============================================
 searchForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -126,16 +127,31 @@ searchForm.addEventListener('submit', async (e) => {
     
     try {
         let faculty = null;
+        const inputLength = userInput.length;
+        
+        // Determine threshold based on input length (Logic Gate)
+        const scoreThreshold = inputLength <= 6 ? 0.15 : 0.45;
         
         if (fuse && allFaculty.length > 0) {
             const fuseResults = fuse.search(userInput);
             
             if (fuseResults.length > 0) {
-                faculty = fuseResults[0].item;
-                console.log(`Fuzzy match found: "${faculty.fullName || faculty.faculty_name}" for query "${userInput}"`);
+                const topMatch = fuseResults[0];
+                const matchScore = topMatch.score;
+                
+                console.log(`Query: "${userInput}" | Length: ${inputLength} | Top match: "${topMatch.item.fullName || topMatch.item.faculty_name}" | Score: ${matchScore.toFixed(3)} | Threshold: ${scoreThreshold}`);
+                
+                // Apply Logic Gate: only accept if score is below threshold
+                if (matchScore < scoreThreshold) {
+                    faculty = topMatch.item;
+                    console.log(`✓ Match accepted (score ${matchScore.toFixed(3)} < ${scoreThreshold})`);
+                } else {
+                    console.log(`✗ Match rejected (score ${matchScore.toFixed(3)} >= ${scoreThreshold})`);
+                }
             }
         }
         
+        // Fallback: exact match from database
         if (!faculty) {
             const { data: exactMatch, error } = await _supabase
                 .from('faculty_reviews')
@@ -146,23 +162,24 @@ searchForm.addEventListener('submit', async (e) => {
             
             if (exactMatch && !error) {
                 faculty = exactMatch;
+                console.log(`Database fallback match found: "${faculty.faculty_name}"`);
             }
         }
 
+        // Display "Not Found" card if no valid match
         if (!faculty) {
             resultArea.innerHTML = `
                 <div class="card slide-up">
                     <div class="card-content" style="padding: 2rem; text-align: center;">
-                        <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">No Results Found</h3>
-                        <p style="color: var(--text-secondary);">
-                            We couldn't find any faculty matching "<strong>${escapeHtml(userInput)}</strong>".
-                            <br><br>
-                            Try checking the spelling or using a different name.
+                        <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1.25rem; font-weight: 700;">"${escapeHtml(userInput)}" is not listed yet.</h3>
+                        <p style="color: var(--text-secondary); line-height: 1.7; font-size: 0.95rem;">
+                            I'm prioritizing updates based on your needs. Kindly drop the faculty name in the Facebook comments or use the <strong>Feedback</strong> button to inbox me the name. Help me to complete the archive.
                         </p>
                     </div>
                 </div>
             `;
             resultArea.style.display = 'block';
+            resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
             return;
         }
 
@@ -224,7 +241,7 @@ function displayFaculty(faculty) {
         <div class="card slide-up">
             <div class="card-header">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); flex: 1; min-width: 200px;">
+                    <h2 class="result-card-headline">
                         ${escapeHtml(fullName)}
                     </h2>
                     ${initial ? `<span class="initial-badge">${escapeHtml(initial)}</span>` : ''}
