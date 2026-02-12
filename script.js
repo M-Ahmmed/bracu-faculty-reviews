@@ -4,7 +4,12 @@
 const supabaseUrl = 'https://mbmgmqignuqgixsabkwv.supabase.co'; 
 const supabaseKey = 'sb_publishable_sUnVlxyJ0hNbb6qn6KJDwg_PVpp_39b'; 
 
+// We will use '_supabase' everywhere to be consistent
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+
+
+ 
 
 // ============================================
 // 2. DOM ELEMENT SELECTION
@@ -12,26 +17,27 @@ const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 const searchForm = document.getElementById('searchForm');
 const searchInput = document.getElementById('searchInput');
 const searchButton = document.getElementById('searchButton');
-const resultArea = document.getElementById('resultArea');
+const courseRatingArea = document.getElementById('courseRatingArea');
+const facultyReviewArea = document.getElementById('facultyReviewArea');
 const spinner = document.getElementById('spinner');
-const themeSwitcher = document.getElementById('themeSwitcher');
-const themeText = document.getElementById('themeText');
+const toast = document.getElementById('toast');
+
+
+
+// Coffee support elements
+const supportBackdrop = document.getElementById('supportBackdrop');
+const supportCloseBtn = document.getElementById('supportCloseBtn');
+const copyNumberBtn = document.getElementById('copyNumberBtn');
+
+// Store current course code globally
+let currentCourseCode = null;
+let currentCourseData = null;
 
 // ============================================
-// 3. THEME SWITCHER FUNCTIONALITY - DARK MODE DEFAULT
+// 3. HARDCODED DARK MODE - THEME SWITCHER REMOVED
 // ============================================
-const currentTheme = localStorage.getItem('theme') || 'dark';
-document.documentElement.setAttribute('data-theme', currentTheme);
-themeText.textContent = currentTheme === 'dark' ? 'Light' : 'Dark';
-
-themeSwitcher.addEventListener('click', () => {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    themeText.textContent = newTheme === 'dark' ? 'Light' : 'Dark';
-});
+// Always dark mode - no localStorage or theme toggle
+document.documentElement.setAttribute('data-theme', 'dark');
 
 // ============================================
 // 3.5 TYPEWRITER ANIMATION
@@ -51,6 +57,56 @@ function typeWriter() {
 }
 
 setTimeout(typeWriter, 300);
+
+// ============================================
+// 3.6 COFFEE SUPPORT HANDLERS
+// ============================================
+function openSupportCard() {
+    supportBackdrop.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeSupportCard() {
+    supportBackdrop.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
+async function copyPhoneNumber() {
+    try {
+        await navigator.clipboard.writeText('01908341690');
+        copyNumberBtn.textContent = '✓ Copied';
+        copyNumberBtn.classList.add('copied');
+        
+        setTimeout(() => {
+            copyNumberBtn.textContent = 'Copy Number';
+            copyNumberBtn.classList.remove('copied');
+        }, 2000);
+    } catch (err) {
+        console.error('Copy failed:', err);
+        showToast('Failed to copy number', 'error');
+    }
+}
+
+// Event listeners for coffee support
+supportCloseBtn.addEventListener('click', closeSupportCard);
+copyNumberBtn.addEventListener('click', copyPhoneNumber);
+
+// Click outside to close
+supportBackdrop.addEventListener('click', (e) => {
+    if (e.target === supportBackdrop) {
+        closeSupportCard();
+    }
+});
+
+// ESC key to close
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && supportBackdrop.classList.contains('show')) {
+        closeSupportCard();
+    }
+});
+
+// Make openSupportCard globally accessible for onclick handlers
+window.openSupportCard = openSupportCard;
 
 // ============================================
 // 4. FUZZY SEARCH WITH FUSE.JS
@@ -73,11 +129,13 @@ async function loadFacultyData() {
                 const parts = faculty.faculty_reviews.split('|');
                 const fullName = parts[0]?.trim() || "";
                 const initial = parts[1]?.trim() || "";
+                const courses = parts[3]?.trim() || "";
                 
                 return {
                     ...faculty,
                     fullName: fullName,
                     initial: initial,
+                    courses: courses,
                     searchableText: `${fullName} ${initial} ${faculty.faculty_name || ''}`
                 };
             }
@@ -85,6 +143,7 @@ async function loadFacultyData() {
                 ...faculty,
                 fullName: "",
                 initial: "",
+                courses: "",
                 searchableText: faculty.faculty_name || ""
             };
         });
@@ -116,94 +175,140 @@ loadFacultyData();
 let debounceTimer = null;
 let suggestionsContainer = null;
 
-// Create suggestions dropdown on page load
 function createSuggestionsContainer() {
-    suggestionsContainer = document.createElement('div');
-    suggestionsContainer.id = 'suggestions-dropdown';
-    suggestionsContainer.className = 'suggestions-dropdown';
-    document.querySelector('.search-input-wrapper').appendChild(suggestionsContainer);
+    const wrapper = document.querySelector('.search-input-wrapper');
+    
+    if (!document.getElementById('suggestions-dropdown')) {
+        suggestionsContainer = document.createElement('div');
+        suggestionsContainer.id = 'suggestions-dropdown';
+        suggestionsContainer.className = 'suggestions-dropdown';
+        wrapper.appendChild(suggestionsContainer);
+    }
 }
 
 createSuggestionsContainer();
 
-// Show suggestions based on user input
-// Show suggestions based on user input
 function showSuggestions(query) {
-    if (!query || query.length < 2) {
+    const cleanQuery = query.trim();
+    if (!cleanQuery || cleanQuery.length < 2) {
         hideSuggestions();
         return;
     }
+
+    const exactInitialMatch = allFaculty.filter(f => 
+        (f.initial || "").toLowerCase() === cleanQuery.toLowerCase()
+    );
+
+    const hasNumber = /\d/.test(cleanQuery);
+    const courseCodePattern = /^[A-Z]{3,4}\s?\d{0,3}$/i;
     
-    if (!fuse || allFaculty.length === 0) {
-        return;
+    if (hasNumber && courseCodePattern.test(cleanQuery)) {
+        showCourseCodeSuggestions(cleanQuery.toUpperCase().replace(/\s/g, ''));
+    } else {
+        showFacultyNameSuggestions(cleanQuery, exactInitialMatch);
     }
+}
+
+function showCourseCodeSuggestions(query) {
+    const allCourseCodes = new Set();
     
-    const inputLength = query.length;
-    
-    // Apply Logic Gate: determine threshold based on input length
-    const scoreThreshold = inputLength <= 6 ? 0.15 : 0.45;
-    
-    // Search using Fuse.js
-    const results = fuse.search(query);
-    
-    // Filter by score threshold
-    const filteredResults = results.filter(result => result.score < scoreThreshold);
-    
-    // Limit to top 5 matches
-    const topResults = filteredResults.slice(0, 5);
-    
-    if (topResults.length === 0) {
-        hideSuggestions();
-        return;
-    }
-    
-    console.log(`Suggestions for "${query}" (${inputLength} chars, threshold: ${scoreThreshold}):`);
-    topResults.forEach((result, index) => {
-        console.log(`  ${index + 1}. ${result.item.fullName || result.item.faculty_name} - Score: ${result.score.toFixed(3)}`);
+    allFaculty.forEach(faculty => {
+        if (faculty.faculty_reviews) {
+            const parts = faculty.faculty_reviews.split('|');
+            const courses = parts[3]?.trim() || "";
+            if (courses) {
+                courses.split(',').forEach(course => {
+                    const trimmed = course.trim();
+                    if (trimmed) allCourseCodes.add(trimmed);
+                });
+            }
+        }
     });
     
-    // Build suggestions HTML as vertical list
-    const suggestionsHTML = topResults.map((result, index) => {
-        const faculty = result.item;
-        const fullName = faculty.fullName || faculty.faculty_name || "Unknown";
-        const initial = faculty.initial || "";
-        
-        return `
-            <div class="suggestion-item" data-name="${escapeHtml(fullName)}" data-index="${index}">
-                <span class="suggestion-name">${escapeHtml(fullName)}</span>
-                ${initial ? `<span class="suggestion-badge">${escapeHtml(initial)}</span>` : ''}
-            </div>
-        `;
-    }).join('');
+    const matchingCourses = Array.from(allCourseCodes)
+        .filter(code => code.startsWith(query))
+        .sort()
+        .slice(0, 5);
+    
+    if (matchingCourses.length === 0) {
+        hideSuggestions();
+        return;
+    }
+    
+    const suggestionsHTML = matchingCourses.map((course, index) => `
+        <div class="suggestion-item course-suggestion" data-course="${escapeHtml(course)}" data-index="${index}">
+            <span class="suggestion-name">${escapeHtml(course)}</span>
+            <span class="suggestion-badge">COURSE</span>
+        </div>
+    `).join('');
     
     suggestionsContainer.innerHTML = suggestionsHTML;
     suggestionsContainer.style.display = 'block';
     
-    // Add click event to each suggestion
-    document.querySelectorAll('.suggestion-item').forEach(item => {
+    document.querySelectorAll('.course-suggestion').forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             
-            const selectedName = e.currentTarget.getAttribute('data-name');
-            const index = e.currentTarget.getAttribute('data-index');
-            
-            console.log(`✓ Suggestion clicked: "${selectedName}" (index: ${index})`);
-            
-            // Fill the search input
-            searchInput.value = selectedName;
-            
-            // CRITICAL: Clear dropdown immediately
-            suggestionsContainer.innerHTML = '';
-            suggestionsContainer.style.display = 'none';
-            
-            // Trigger the search
+            const selectedCourse = e.currentTarget.getAttribute('data-course');
+            searchInput.value = selectedCourse;
+            hideSuggestions();
             searchForm.dispatchEvent(new Event('submit'));
         });
     });
 }
 
-// Hide suggestions
+function showFacultyNameSuggestions(query, manualMatches = []) {
+    const queryLower = query.toLowerCase();
+    
+    const results = fuse.search(queryLower);
+    
+    const combinedMap = new Map();
+    
+    manualMatches.forEach(f => {
+        combinedMap.set(f.faculty_id || f.fullName, { item: f, score: 0 });
+    });
+    
+    results.forEach(result => {
+        const id = result.item.faculty_id || result.item.fullName;
+        if (!combinedMap.has(id) && result.score < 0.5) {
+            combinedMap.set(id, result);
+        }
+    });
+
+    const finalResults = Array.from(combinedMap.values()).slice(0, 5);
+
+    if (finalResults.length === 0) {
+        hideSuggestions();
+        return;
+    }
+
+    const suggestionsHTML = finalResults.map((result) => {
+        const faculty = result.item;
+        const fullName = faculty.fullName || faculty.faculty_name || "Unknown";
+        const initial = faculty.initial || "";
+        
+        return `
+            <div class="suggestion-item" data-name="${escapeHtml(fullName)}">
+                <span class="suggestion-name">${escapeHtml(fullName)}</span>
+                ${initial ? `<span class="suggestion-badge">${escapeHtml(initial)}</span>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    suggestionsContainer.innerHTML = suggestionsHTML;
+    suggestionsContainer.style.display = 'block';
+
+    document.querySelectorAll('.suggestion-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            const selectedName = e.currentTarget.getAttribute('data-name');
+            searchInput.value = selectedName;
+            hideSuggestions();
+            searchForm.dispatchEvent(new Event('submit'));
+        });
+    });
+}
+
 function hideSuggestions() {
     if (suggestionsContainer) {
         suggestionsContainer.style.display = 'none';
@@ -211,120 +316,65 @@ function hideSuggestions() {
     }
 }
 
-// Debounced input handler
 searchInput.addEventListener('input', (e) => {
     const query = e.target.value.trim();
     
-    // Clear previous timer
     if (debounceTimer) {
         clearTimeout(debounceTimer);
     }
     
-    // Set new timer (200ms delay)
     debounceTimer = setTimeout(() => {
         showSuggestions(query);
     }, 200);
 });
 
-// Hide suggestions when clicking outside
 document.addEventListener('click', (e) => {
     if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
         hideSuggestions();
     }
 });
 
-// Hide suggestions on ESC key
 searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         hideSuggestions();
     }
 });
 
-// Hide suggestions when form is submitted
 searchForm.addEventListener('submit', () => {
     hideSuggestions();
 }, true);
 
 // ============================================
-// 5. SEARCH FUNCTIONALITY WITH LOGIC GATE
+// 5. SEARCH FUNCTIONALITY WITH COURSE CODE DETECTION
 // ============================================
 searchForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
-    // Hide suggestions when form is submitted
     hideSuggestions();
     
     const userInput = searchInput.value.trim();
     if (!userInput) {
-        alert('Please enter a faculty name');
+        alert('Please enter a faculty name or course code');
         return;
     }
 
     searchButton.disabled = true;
     searchButton.classList.add('loading');
     
+    // INCREMENT GLOBAL SEARCH COUNT
+   
+    
     try {
-        let faculty = null;
-        const inputLength = userInput.length;
+        const courseCodePattern = /^[A-Z]{3,4}\s?\d{3}$/i;
+        const isCourseCode = courseCodePattern.test(userInput);
         
-        // Determine threshold based on input length (Logic Gate)
-        const scoreThreshold = inputLength <= 6 ? 0.15 : 0.45;
-        
-        if (fuse && allFaculty.length > 0) {
-            const fuseResults = fuse.search(userInput);
-            
-            if (fuseResults.length > 0) {
-                const topMatch = fuseResults[0];
-                const matchScore = topMatch.score;
-                
-                console.log(`Query: "${userInput}" | Length: ${inputLength} | Top match: "${topMatch.item.fullName || topMatch.item.faculty_name}" | Score: ${matchScore.toFixed(3)} | Threshold: ${scoreThreshold}`);
-                
-                // Apply Logic Gate: only accept if score is below threshold
-                if (matchScore < scoreThreshold) {
-                    faculty = topMatch.item;
-                    console.log(`✓ Match accepted (score ${matchScore.toFixed(3)} < ${scoreThreshold})`);
-                } else {
-                    console.log(`✗ Match rejected (score ${matchScore.toFixed(3)} >= ${scoreThreshold})`);
-                }
-            }
+        if (isCourseCode) {
+            await handleCourseCodeSearch(userInput.toUpperCase().replace(/\s/g, ''));
+        } else {
+            await handleFacultyNameSearch(userInput);
         }
-        
-        // Fallback: exact match from database
-        if (!faculty) {
-            const { data: exactMatch, error } = await _supabase
-                .from('faculty_reviews')
-                .select('*')
-                .ilike('faculty_name', `%${userInput}%`)
-                .limit(1)
-                .single();
-            
-            if (exactMatch && !error) {
-                faculty = exactMatch;
-                console.log(`Database fallback match found: "${faculty.faculty_name}"`);
-            }
-        }
-
-        // Display "Not Found" card if no valid match
-        if (!faculty) {
-            resultArea.innerHTML = `
-                <div class="card slide-up">
-                    <div class="card-content" style="padding: 2rem; text-align: center;">
-                        <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1.25rem; font-weight: 700;">"${escapeHtml(userInput)}" is not listed yet.</h3>
-                        <p style="color: var(--text-secondary); line-height: 1.7; font-size: 0.95rem;">
-                            I'm prioritizing updates based on your needs. Kindly drop the faculty name in the Facebook comments or use the <strong>Feedback</strong> button to inbox me the name. Help me to complete the archive.
-                        </p>
-                    </div>
-                </div>
-            `;
-            resultArea.style.display = 'block';
-            resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            return;
-        }
-
-        displayFaculty(faculty);
     } catch (err) {
-        console.error('Error searching faculty:', err);
-        resultArea.innerHTML = `
+        console.error('Error searching:', err);
+        courseRatingArea.innerHTML = `
             <div class="card slide-up">
                 <div class="card-content" style="padding: 2rem; text-align: center;">
                     <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">Error</h3>
@@ -334,7 +384,8 @@ searchForm.addEventListener('submit', async (e) => {
                 </div>
             </div>
         `;
-        resultArea.style.display = 'block';
+        courseRatingArea.style.display = 'block';
+        facultyReviewArea.style.display = 'none';
     } finally {
         searchButton.disabled = false;
         searchButton.classList.remove('loading');
@@ -342,9 +393,277 @@ searchForm.addEventListener('submit', async (e) => {
 });
 
 // ============================================
+// 5.1 COURSE CODE SEARCH HANDLER
+// ============================================
+async function handleCourseCodeSearch(courseCode) {
+    console.log(`Searching for course code: ${courseCode}`);
+    
+    currentCourseCode = courseCode;
+    
+    const facultyWithCourse = allFaculty.filter(faculty => {
+        if (faculty.faculty_reviews) {
+            const parts = faculty.faculty_reviews.split('|');
+            const courses = parts[3]?.trim() || "";
+            return courses.includes(courseCode);
+        }
+        return false;
+    });
+    
+    if (facultyWithCourse.length === 0) {
+        courseRatingArea.innerHTML = `
+            <div class="card slide-up">
+                <div class="card-content" style="padding: 2rem; text-align: center;">
+                    <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1.25rem; font-weight: 700;">No faculty found for "${escapeHtml(courseCode)}"</h3>
+                    <p style="color: var(--text-secondary); line-height: 1.7; font-size: 0.95rem;">
+                        This course might not be in our database yet, or no faculty reviews are available for it.
+                    </p>
+                </div>
+            </div>
+        `;
+        courseRatingArea.style.display = 'block';
+        facultyReviewArea.style.display = 'none';
+        courseRatingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+    }
+    
+    const facultyWithRatings = facultyWithCourse.map(faculty => {
+        const parts = faculty.faculty_reviews.split('|');
+        const fullName = parts[0]?.trim() || "Unknown";
+        const initial = parts[1]?.trim() || "";
+        const teaching = parseFloat(parts[4]) || 0;
+        const marking = parseFloat(parts[5]) || 0;
+        const behavior = parseFloat(parts[6]) || 0;
+        
+        const avgRating = ((teaching + marking + behavior) / 3) / 10 * 100;
+        
+        return {
+            fullName,
+            initial,
+            avgRating: avgRating.toFixed(1),
+            rawData: faculty
+        };
+    });
+    
+    facultyWithRatings.sort((a, b) => parseFloat(b.avgRating) - parseFloat(a.avgRating));
+    
+    currentCourseData = facultyWithRatings;
+    
+    const facultyRowsHTML = facultyWithRatings.map((faculty, index) => `
+        <div class="faculty-row" onclick="searchFaculty('${escapeHtml(faculty.fullName)}')" data-index="${index}">
+            <div class="faculty-column">
+                <div class="faculty-header-inline">
+                    <span class="faculty-name-top">${escapeHtml(faculty.fullName)}</span>
+                    <div class="faculty-initial-badge-inline">${escapeHtml(faculty.initial)}</div>
+                </div>
+                <div class="rating-bar-wrapper">
+                    <div class="rating-bar-container">
+                        <div class="rating-bar-fill" data-rating="${faculty.avgRating}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    courseRatingArea.innerHTML = `
+        <div class="card slide-up course-results-card">
+            <div class="card-header">
+                <h2>Faculty Teaching ${escapeHtml(courseCode)}</h2>
+            </div>
+            <div class="faculty-list">
+                ${facultyRowsHTML}
+            </div>
+            <div class="card-footer">
+                <span class="footer-text">Click any faculty to view full review</span>
+            </div>
+        </div>
+    `;
+    
+    courseRatingArea.style.display = 'block';
+    facultyReviewArea.style.display = 'none';
+    courseRatingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    setTimeout(() => {
+        document.querySelectorAll('.rating-bar-fill').forEach((bar, index) => {
+            setTimeout(() => {
+                const rating = bar.getAttribute('data-rating');
+                bar.style.setProperty('--target-width', `${rating}%`);
+                bar.classList.add('animate');
+            }, index * 100);
+        });
+    }, 50);
+}
+
+window.searchFaculty = function(facultyName) {
+    handleFacultyNameSearch(facultyName, true);
+};
+
+// ============================================
+// 5.2 FACULTY NAME SEARCH HANDLER
+// ============================================
+async function handleFacultyNameSearch(userInput, keepRatingCard = false) {
+    let faculty = null;
+    const inputLength = userInput.length;
+    const scoreThreshold = inputLength <= 6 ? 0.15 : 0.45;
+    
+    if (fuse && allFaculty.length > 0) {
+        const fuseResults = fuse.search(userInput);
+        
+        if (fuseResults.length > 0) {
+            const topMatch = fuseResults[0];
+            const matchScore = topMatch.score;
+            
+            console.log(`Query: "${userInput}" | Length: ${inputLength} | Top match: "${topMatch.item.fullName || topMatch.item.faculty_name}" | Score: ${matchScore.toFixed(3)} | Threshold: ${scoreThreshold}`);
+            
+            if (matchScore < scoreThreshold) {
+                faculty = topMatch.item;
+                console.log(`✓ Match accepted (score ${matchScore.toFixed(3)} < ${scoreThreshold})`);
+            } else {
+                console.log(`✗ Match rejected (score ${matchScore.toFixed(3)} >= ${scoreThreshold})`);
+            }
+        }
+    }
+    
+    if (!faculty) {
+        const { data: exactMatch, error } = await _supabase
+            .from('faculty_reviews')
+            .select('*')
+            .ilike('faculty_name', `%${userInput}%`)
+            .limit(1)
+            .single();
+        
+        if (exactMatch && !error) {
+            faculty = exactMatch;
+            console.log(`Database fallback match found: "${faculty.faculty_name}"`);
+        }
+    }
+
+    if (!faculty) {
+        if (!keepRatingCard) {
+            courseRatingArea.innerHTML = `
+                <div class="card slide-up">
+                    <div class="card-content" style="padding: 2rem; text-align: center;">
+                        <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1.25rem; font-weight: 700;">"${escapeHtml(userInput)}" is not listed yet.</h3>
+                        <p style="color: var(--text-secondary); line-height: 1.7; font-size: 0.95rem;">
+                            I'm prioritizing updates based on your needs. Kindly drop the faculty name in the Facebook comments or use the <strong>Feedback</strong> button to inbox me the name. Help me to complete the archive.
+                        </p>
+                    </div>
+                </div>
+            `;
+            courseRatingArea.style.display = 'block';
+            facultyReviewArea.style.display = 'none';
+            courseRatingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+    }
+
+    displayFaculty(faculty, keepRatingCard);
+}
+
+// ============================================
+// CONSENSUS PILL VOTE HANDLER
+// ============================================
+async function handleVote(reviewId, voteType) {
+    const storageKey = `vote_status_${reviewId}`;
+    const currentVote = localStorage.getItem(storageKey);
+    
+    const upSection = document.querySelector(`#vote-up-${reviewId}`);
+    const downSection = document.querySelector(`#vote-down-${reviewId}`);
+    const counter = document.querySelector(`#vote-counter-${reviewId}`);
+    
+    let voteChange = 0;
+    let newVoteStatus = null;
+    
+    if (voteType === 'up') {
+        if (currentVote === 'up') {
+            voteChange = -1;
+            newVoteStatus = null;
+            upSection.classList.remove('up-active');
+        } else if (currentVote === 'down') {
+            voteChange = 2;
+            newVoteStatus = 'up';
+            downSection.classList.remove('down-active');
+            upSection.classList.add('up-active');
+        } else {
+            voteChange = 1;
+            newVoteStatus = 'up';
+            upSection.classList.add('up-active');
+        }
+    } else if (voteType === 'down') {
+        if (currentVote === 'down') {
+            voteChange = 1;
+            newVoteStatus = null;
+            downSection.classList.remove('down-active');
+        } else if (currentVote === 'up') {
+            voteChange = -2;
+            newVoteStatus = 'down';
+            upSection.classList.remove('up-active');
+            downSection.classList.add('down-active');
+        } else {
+            voteChange = -1;
+            newVoteStatus = 'down';
+            downSection.classList.add('down-active');
+        }
+    }
+    
+    const clickedSection = voteType === 'up' ? upSection : downSection;
+    clickedSection.classList.add('clicked');
+    setTimeout(() => clickedSection.classList.remove('clicked'), 300);
+    
+    if (newVoteStatus) {
+        localStorage.setItem(storageKey, newVoteStatus);
+    } else {
+        localStorage.removeItem(storageKey);
+    }
+    
+    try {
+        const { data, error } = await _supabase.rpc('increment_vote', {
+            review_id: reviewId,
+            vote_change: voteChange
+        });
+        
+        if (error) throw error;
+        
+        counter.textContent = data || 0;
+    } catch (err) {
+        console.error('Vote error:', err);
+        
+        if (newVoteStatus === 'up') {
+            upSection.classList.remove('up-active');
+        } else if (newVoteStatus === 'down') {
+            downSection.classList.remove('down-active');
+        }
+        
+        if (currentVote) {
+            localStorage.setItem(storageKey, currentVote);
+        } else {
+            localStorage.removeItem(storageKey);
+        }
+        
+        showToast('Vote failed. Please try again.', 'error');
+    }
+}
+
+function initializeVotePill(reviewId, currentScore) {
+    const storageKey = `vote_status_${reviewId}`;
+    const savedVote = localStorage.getItem(storageKey);
+    
+    const upSection = document.querySelector(`#vote-up-${reviewId}`);
+    const downSection = document.querySelector(`#vote-down-${reviewId}`);
+    
+    if (savedVote === 'up') {
+        upSection.classList.add('up-active');
+    } else if (savedVote === 'down') {
+        downSection.classList.add('down-active');
+    }
+}
+
+// Make handleVote globally accessible
+window.handleVote = handleVote;
+
+// ============================================
 // 6. DISPLAY FACULTY RESULTS
 // ============================================
-function displayFaculty(faculty) {
+function displayFaculty(faculty, keepRatingCard = false) {
     let fullName, initial, email, courses, teaching, marking, behavior, overallSummary, statisticalInsights;
     
     if (faculty.faculty_reviews) {
@@ -375,8 +694,8 @@ function displayFaculty(faculty) {
         `<span style="display: inline-block; background: var(--input-bg); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.75rem; margin-right: 0.5rem; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">${escapeHtml(course)}</span>`
     ).join('');
 
-    resultArea.innerHTML = `
-        <div class="card slide-up">
+    facultyReviewArea.innerHTML = `
+        <div class="card slide-up" style="z-index: 1 !important;">
             <div class="card-header">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
                     <h2 class="result-card-headline">
@@ -411,17 +730,57 @@ function displayFaculty(faculty) {
                 <div>
                     <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1rem; font-weight: 600; letter-spacing: 0.5px;">What Students Say</span>
                     ${parseInsights(statisticalInsights)}
+                    
+                    <div class="consensus-pill-wrapper">
+                        <div class="vote-pill">
+                            <div class="vote-section" id="vote-up-${faculty.id}" onclick="handleVote(${faculty.id}, 'up')">
+                                <span class="vote-text">Agree</span>
+                                <svg class="arrow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 4l-8 8h5v8h6v-8h5z"/>
+                                </svg>
+                            </div>
+                            
+                            <span class="vote-counter" id="vote-counter-${faculty.id}">${faculty.vote_score || 0}</span>
+                            
+                            <div class="vote-divider"></div>
+                            
+                            <div class="vote-section" id="vote-down-${faculty.id}" onclick="handleVote(${faculty.id}, 'down')">
+                                <svg class="arrow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 20l8-8h-5V4H9v8H4z"/>
+                                </svg>
+                                <span class="vote-text">Disagree</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
             <div class="card-footer">
-                <span class="footer-link" onclick="toggleAboutCard()">Disclaimer & Data Notice</span>
+                <div>
+                    <span class="footer-link" onclick="toggleAboutCard()">Disclaimer & Data Notice</span>
+                </div>
+                <div class="coffee-trigger" onclick="openSupportCard()">
+                    <span class="coffee-icon">☕</span>
+                    
+                </div>
             </div>
         </div>
     `;
 
-    resultArea.style.display = 'block';
-    resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    facultyReviewArea.style.display = 'block';
+    
+    if (!keepRatingCard) {
+        courseRatingArea.style.display = 'none';
+        facultyReviewArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        setTimeout(() => {
+            facultyReviewArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+    
+    setTimeout(() => {
+        initializeVotePill(faculty.id, faculty.vote_score || 0);
+    }, 100);
 }
 
 // ============================================
@@ -512,7 +871,8 @@ function renderAboutCard() {
             </div>
             
             <div class="card-footer">
-                <span class="footer-link" onclick="closeAboutCard()">Close</span>
+                <div><span class="footer-link" onclick="toggleAboutCard()">Disclaimer & Data Notice</span></div>
+                <div class="coffee-trigger" onclick="openSupportCard()"><span class="coffee-icon">☕</span>
             </div>
         </div>
     `;
@@ -523,4 +883,20 @@ function renderAboutCard() {
 function closeAboutCard() {
     const aboutArea = document.getElementById('aboutArea');
     aboutArea.style.display = 'none';
+}
+
+// Make toggleAboutCard globally accessible
+window.toggleAboutCard = toggleAboutCard;
+
+// ============================================
+// 12. TOAST NOTIFICATIONS
+// ============================================
+function showToast(message, type = 'success') {
+    toast.textContent = message;
+    toast.className = `toast ${type}`;
+    toast.classList.add('show');
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 4000);
 }

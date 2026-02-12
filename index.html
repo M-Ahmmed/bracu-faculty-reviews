@@ -35,7 +35,7 @@
                         <input 
                             type="text" 
                             class="search-input" 
-                            placeholder="Search faculty name..."
+                            placeholder="Search faculty name or course code..."
                             id="searchInput"
                             autocomplete="off"
                         />
@@ -53,15 +53,42 @@
                     <span class="separator">|</span>
                     <a href="https://www.facebook.com/mueen.ahmmed.7" target="_blank" class="footer-link">Send me feedback 💬</a>
                 </div>
-                <button class="theme-switcher" id="themeSwitcher">
-                    <span class="theme-text" id="themeText">Dark</span>
-                </button>
+                
             </div>
         </div>
         
-        <div id="resultArea" style="display: none; margin-top: 32px;"></div>
+        <!-- Course Rating Card (Leaderboard) - Stays visible when faculty review is shown -->
+        <div id="courseRatingArea" style="display: none; margin-top: 32px;"></div>
+        
+        <!-- Individual Faculty Review Card - Appears below rating card -->
+        <div id="facultyReviewArea" style="display: none; margin-top: 32px;"></div>
         
         <div id="aboutArea" style="display: none; margin-top: 32px;"></div>
+    </div>
+    
+    <!-- Success/Error Toast -->
+    <div class="toast" id="toast"></div>
+    
+    <!-- Coffee Support Backdrop (iOS Sheet Style) -->
+    <div class="support-backdrop" id="supportBackdrop">
+        <div class="support-card" onclick="event.stopPropagation()">
+            <div class="support-header">
+                <button class="support-close" id="supportCloseBtn">×</button>
+                <h3 class="support-headline">You can buy me a sugar-free coffee. I won't mind! 😉
+                               (it's just 20tk in the BRACU cafeteria)</h3>
+            </div>
+            <div class="support-body">
+                <div class="number-glass-container">
+                    <div class="payment-indicators">
+                        <span class="payment-badge">Bkash</span>
+                        <span class="payment-badge">Nagad</span>
+                    </div>
+                    <div class="phone-number">01908341690</div>
+                    <button class="copy-button" id="copyNumberBtn">Copy Number</button>
+                </div>
+                <p class="support-footer-note">This is optional. Thank you! ☕</p>
+            </div>
+        </div>
     </div>
     
     <script src="script.js"></script>
