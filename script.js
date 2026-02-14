@@ -7,10 +7,6 @@ const supabaseKey = 'sb_publishable_sUnVlxyJ0hNbb6qn6KJDwg_PVpp_39b';
 // We will use '_supabase' everywhere to be consistent
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-
-
- 
-
 // ============================================
 // 2. DOM ELEMENT SELECTION
 // ============================================
@@ -22,16 +18,35 @@ const facultyReviewArea = document.getElementById('facultyReviewArea');
 const spinner = document.getElementById('spinner');
 const toast = document.getElementById('toast');
 
-
-
 // Coffee support elements
 const supportBackdrop = document.getElementById('supportBackdrop');
 const supportCloseBtn = document.getElementById('supportCloseBtn');
 const copyNumberBtn = document.getElementById('copyNumberBtn');
 
-// Store current course code globally
+// Student review modal elements
+const reviewBackdrop = document.getElementById('reviewBackdrop');
+const emailLoginStep = document.getElementById('emailLoginStep');
+const reviewFormStep = document.getElementById('reviewFormStep');
+const reviewCloseBtn1 = document.getElementById('reviewCloseBtn1');
+const reviewCloseBtn2 = document.getElementById('reviewCloseBtn2');
+const emailContinueBtn = document.getElementById('emailContinueBtn');
+const reviewEmailInput = document.getElementById('reviewEmailInput');
+const teachingSlider = document.getElementById('teachingSlider');
+const markingSlider = document.getElementById('markingSlider');
+const behaviorSlider = document.getElementById('behaviorSlider');
+const teachingValue = document.getElementById('teachingValue');
+const markingValue = document.getElementById('markingValue');
+const behaviorValue = document.getElementById('behaviorValue');
+const reviewFeedback = document.getElementById('reviewFeedback');
+const charCounter = document.getElementById('charCounter');
+const submitReviewBtn = document.getElementById('submitReviewBtn');
+const reviewFacultyName = document.getElementById('reviewFacultyName');
+const reviewCourseCode = document.getElementById('reviewCourseCode');
+
+// Store current course code and faculty globally
 let currentCourseCode = null;
 let currentCourseData = null;
+let currentFacultyForReview = null;
 
 // ============================================
 // 3. HARDCODED DARK MODE - THEME SWITCHER REMOVED
@@ -100,8 +115,13 @@ supportBackdrop.addEventListener('click', (e) => {
 
 // ESC key to close
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && supportBackdrop.classList.contains('show')) {
-        closeSupportCard();
+    if (e.key === 'Escape') {
+        if (supportBackdrop.classList.contains('show')) {
+            closeSupportCard();
+        }
+        if (reviewBackdrop.classList.contains('show')) {
+            closeReviewModal();
+        }
     }
 });
 
@@ -359,9 +379,6 @@ searchForm.addEventListener('submit', async (e) => {
 
     searchButton.disabled = true;
     searchButton.classList.add('loading');
-    
-    // INCREMENT GLOBAL SEARCH COUNT
-   
     
     try {
         const courseCodePattern = /^[A-Z]{3,4}\s?\d{3}$/i;
@@ -661,9 +678,404 @@ function initializeVotePill(reviewId, currentScore) {
 window.handleVote = handleVote;
 
 // ============================================
-// 6. DISPLAY FACULTY RESULTS
+// 6. STUDENT REVIEW SYSTEM
 // ============================================
-function displayFaculty(faculty, keepRatingCard = false) {
+
+// 6.1 Authentication Check
+function checkUserAuth() {
+    return localStorage.getItem('bracu_user_email');
+}
+
+// 6.2 Email Validation
+function validateBracuEmail(email) {
+    const emailRegex = /^[a-z0-9._%+-]+@g\.bracu\.ac\.bd$/i;
+    return emailRegex.test(email);
+}
+
+// 6.3 Open Review Modal
+function openReviewModal(facultyId, facultyName) {
+    currentFacultyForReview = { id: facultyId, name: facultyName };
+    
+    const userEmail = checkUserAuth();
+    
+    if (!userEmail) {
+        // Show email login step
+        emailLoginStep.style.display = 'block';
+        reviewFormStep.style.display = 'none';
+        reviewEmailInput.value = '';
+    } else {
+        // Show review form directly
+        emailLoginStep.style.display = 'none';
+        reviewFormStep.style.display = 'block';
+        reviewFacultyName.textContent = `Review ${facultyName}`;
+        
+        // Check if user already reviewed this faculty
+        checkExistingReview(facultyId, userEmail);
+    }
+    
+    reviewBackdrop.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+// 6.4 Close Review Modal
+function closeReviewModal() {
+    reviewBackdrop.classList.remove('show');
+    document.body.style.overflow = '';
+    
+    // Reset form
+    setTimeout(() => {
+        emailLoginStep.style.display = 'block';
+        reviewFormStep.style.display = 'none';
+        reviewEmailInput.value = '';
+        reviewCourseCode.value = '';
+        teachingSlider.value = 5;
+        markingSlider.value = 5;
+        behaviorSlider.value = 5;
+        teachingValue.textContent = '5.0';
+        markingValue.textContent = '5.0';
+        behaviorValue.textContent = '5.0';
+        reviewFeedback.value = '';
+        charCounter.textContent = '0/500';
+        currentFacultyForReview = null;
+    }, 300);
+}
+
+// Event listeners for review modal
+reviewCloseBtn1.addEventListener('click', closeReviewModal);
+reviewCloseBtn2.addEventListener('click', closeReviewModal);
+
+reviewBackdrop.addEventListener('click', (e) => {
+    if (e.target === reviewBackdrop) {
+        closeReviewModal();
+    }
+});
+
+// 6.5 Email Continue Button
+emailContinueBtn.addEventListener('click', async () => {
+    const email = reviewEmailInput.value.trim();
+    
+    if (!email) {
+        showToast('Please enter your email', 'error');
+        return;
+    }
+    
+    if (!validateBracuEmail(email)) {
+        showToast('Please use a valid @g.bracu.ac.bd email', 'error');
+        return;
+    }
+    
+    // Store email in localStorage
+    localStorage.setItem('bracu_user_email', email);
+    
+    // Show review form
+    emailLoginStep.style.display = 'none';
+    reviewFormStep.style.display = 'block';
+    reviewFacultyName.textContent = `Review ${currentFacultyForReview.name}`;
+    
+    // Check if user already reviewed this faculty
+    await checkExistingReview(currentFacultyForReview.id, email);
+});
+
+// 6.6 Check Existing Review
+async function checkExistingReview(facultyId, userEmail) {
+    try {
+        const { data, error } = await _supabase
+            .from('student_reviews')
+            .select('*')
+            .eq('faculty_id', facultyId)
+            .eq('student_email', userEmail)
+            .maybeSingle();  // CRITICAL FIX: Use maybeSingle() instead of single()
+        
+        if (data && !error) {
+            // User has already reviewed, pre-fill form
+            reviewCourseCode.value = data.course_code || '';
+            teachingSlider.value = data.teaching_rating || 5;
+            markingSlider.value = data.marking_rating || 5;
+            behaviorSlider.value = data.behavior_rating || 5;
+            teachingValue.textContent = (data.teaching_rating || 5).toFixed(1);
+            markingValue.textContent = (data.marking_rating || 5).toFixed(1);
+            behaviorValue.textContent = (data.behavior_rating || 5).toFixed(1);
+            reviewFeedback.value = data.raw_feedback || '';
+            charCounter.textContent = `${(data.raw_feedback || '').length}/500`;
+            
+            submitReviewBtn.textContent = 'Update Review';
+        } else {
+            submitReviewBtn.textContent = 'Submit Review';
+        }
+    } catch (err) {
+        console.error('Error checking existing review:', err);
+        submitReviewBtn.textContent = 'Submit Review';
+    }
+}
+
+// 6.7 Slider Value Updates
+teachingSlider.addEventListener('input', (e) => {
+    teachingValue.textContent = parseFloat(e.target.value).toFixed(1);
+});
+
+markingSlider.addEventListener('input', (e) => {
+    markingValue.textContent = parseFloat(e.target.value).toFixed(1);
+});
+
+behaviorSlider.addEventListener('input', (e) => {
+    behaviorValue.textContent = parseFloat(e.target.value).toFixed(1);
+});
+
+// 6.8 Character Counter
+reviewFeedback.addEventListener('input', (e) => {
+    const length = e.target.value.length;
+    charCounter.textContent = `${length}/500`;
+    
+    // Visual feedback: turn green when minimum reached
+    if (length < 3) {
+        charCounter.style.color = 'var(--error-color)';
+    } else if (length >= 3 && length <= 500) {
+        charCounter.style.color = '#22c55e';  // Green
+    } else {
+        charCounter.style.color = 'var(--error-color)';
+    }
+});
+
+// 6.9 Submit Review - CRITICAL FIXES APPLIED
+submitReviewBtn.addEventListener('click', async () => {
+    const userEmail = checkUserAuth();
+    
+    if (!userEmail || !currentFacultyForReview) {
+        showToast('Session expired. Please try again.', 'error');
+        closeReviewModal();
+        return;
+    }
+    
+    const courseCode = reviewCourseCode.value.trim().toUpperCase() || null;
+    const teaching = parseFloat(teachingSlider.value);
+    const marking = parseFloat(markingSlider.value);
+    const behavior = parseFloat(behaviorSlider.value);
+    const feedback = reviewFeedback.value.trim();
+    
+    // Validation
+    if (feedback.length < 3) {
+        showToast(`Need ${3 - feedback.length} more characters (${feedback.length}/3 minimum)`, 'error');
+        return;
+    }
+    
+    if (feedback.length > 500) {
+        showToast('Feedback cannot exceed 500 characters', 'error');
+        return;
+    }
+    
+    submitReviewBtn.disabled = true;
+    submitReviewBtn.textContent = 'Submitting...';
+    
+    try {
+        console.log('Attempting to submit review...', {
+            faculty_id: currentFacultyForReview.id,
+            student_email: userEmail,
+            course_code: courseCode,
+            teaching_rating: teaching,
+            marking_rating: marking,
+            behavior_rating: behavior,
+            feedback_length: feedback.length
+        });
+        
+        // Check if updating existing review
+        const { data: existing, error: checkError } = await _supabase
+            .from('student_reviews')
+            .select('id')
+            .eq('faculty_id', currentFacultyForReview.id)
+            .eq('student_email', userEmail)
+            .maybeSingle();  // CRITICAL FIX: Use maybeSingle()
+        
+        if (checkError) {
+            console.error('Error checking existing review:', checkError);
+            throw checkError;
+        }
+        
+        if (existing) {
+            console.log('Updating existing review:', existing.id);
+            // Update existing review
+            const { data: updateData, error: updateError } = await _supabase
+                .from('student_reviews')
+                .update({
+                    course_code: courseCode,
+                    teaching_rating: teaching,
+                    marking_rating: marking,
+                    behavior_rating: behavior,
+                    raw_feedback: feedback,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', existing.id)
+                .select();  // CRITICAL FIX: Add .select() to get response
+            
+            if (updateError) {
+                console.error('Update error:', updateError);
+                throw updateError;
+            }
+            
+            console.log('Update successful:', updateData);
+            showToast('Review updated successfully!', 'success');
+        } else {
+            console.log('Inserting new review...');
+            // Insert new review
+            const { data: insertData, error: insertError } = await _supabase
+                .from('student_reviews')
+                .insert({
+                    faculty_id: currentFacultyForReview.id,
+                    student_email: userEmail,
+                    course_code: courseCode,
+                    teaching_rating: teaching,
+                    marking_rating: marking,
+                    behavior_rating: behavior,
+                    raw_feedback: feedback
+                })
+                .select();  // CRITICAL FIX: Add .select() to get response
+            
+            if (insertError) {
+                console.error('Insert error:', insertError);
+                throw insertError;
+            }
+            
+            console.log('Insert successful:', insertData);
+            showToast('Review submitted successfully!', 'success');
+        }
+        
+        closeReviewModal();
+        
+        // Reload reviews for this faculty
+        const currentFaculty = allFaculty.find(f => f.id === currentFacultyForReview.id);
+        if (currentFaculty) {
+            setTimeout(() => {
+                displayFaculty(currentFaculty, true);
+            }, 500);
+        }
+        
+    } catch (err) {
+        console.error('Error submitting review:', err);
+        
+        if (err.message && err.message.includes('Daily review limit reached')) {
+            showToast('Daily review limit reached (10 per day)', 'error');
+        } else if (err.message) {
+            showToast(`Error: ${err.message}`, 'error');
+        } else {
+            showToast('Failed to submit review. Please try again.', 'error');
+        }
+    } finally {
+        submitReviewBtn.disabled = false;
+        submitReviewBtn.textContent = 'Submit Review';
+    }
+});
+
+// 6.10 Load Student Reviews - WITH PAGINATION
+async function loadStudentReviews(facultyId, limit = 5, offset = 0) {
+    try {
+        // Get total count
+        const { count } = await _supabase
+            .from('student_reviews')
+            .select('*', { count: 'exact', head: true })
+            .eq('faculty_id', facultyId);
+        
+        // Get paginated reviews
+        const { data, error } = await _supabase
+            .from('student_reviews')
+            .select('*')
+            .eq('faculty_id', facultyId)
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1);
+        
+        if (error) throw error;
+        
+        return {
+            reviews: data || [],
+            total: count || 0,
+            hasMore: (offset + limit) < (count || 0)
+        };
+    } catch (err) {
+        console.error('Error loading reviews:', err);
+        return { reviews: [], total: 0, hasMore: false };
+    }
+}
+
+// 6.12 Format Time Ago
+function formatTimeAgo(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 2592000) return `${Math.floor(seconds / 86400)}d ago`;
+    return `${Math.floor(seconds / 2592000)}mo ago`;
+}
+
+// 6.13 Handle Share Link - CRITICAL FIX
+async function handleShareLink(facultyId, facultyName) {
+    // FIXED: Generate correct review-specific URL
+    const baseUrl = window.location.origin + window.location.pathname;
+    const url = `${baseUrl}?reviewFaculty=${facultyId}`;
+    
+    console.log('Share link generated:', url);
+    
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('✓ Review form link copied! Now share link with classmates or seniors.', 'success');
+    } catch (err) {
+        console.error('Copy failed:', err);
+        showToast('Failed to copy link', 'error');
+    }
+}
+
+// 6.14 Check URL Parameters on Load
+window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const reviewFacultyId = urlParams.get('reviewFaculty');
+    
+    if (reviewFacultyId) {
+        console.log('Share link detected for faculty ID:', reviewFacultyId);
+        
+        // Wait for faculty data to load, then open modal
+        const checkFacultyLoaded = setInterval(() => {
+            if (allFaculty.length > 0) {
+                clearInterval(checkFacultyLoaded);
+                
+                const faculty = allFaculty.find(f => f.id === parseInt(reviewFacultyId));
+                
+                if (faculty) {
+                    const parts = faculty.faculty_reviews?.split('|') || [];
+                    const fullName = parts[0]?.trim() || "Faculty";
+                    
+                    // Open review modal after a short delay
+                    setTimeout(() => {
+                        openReviewModal(faculty.id, fullName);
+                    }, 500);
+                } else {
+                    console.error('Faculty not found for ID:', reviewFacultyId);
+                }
+            }
+        }, 100);
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+            clearInterval(checkFacultyLoaded);
+        }, 5000);
+    }
+});
+
+// Make openReviewModal globally accessible
+window.openReviewModal = openReviewModal;
+window.handleShareLink = handleShareLink;
+
+// ============================================
+// 7. DISPLAY FACULTY RESULTS WITH REVIEWS
+// ============================================
+
+// Global variable to track review pagination
+let currentReviewOffset = 0;
+let currentDisplayedFaculty = null;
+
+async function displayFaculty(faculty, keepRatingCard = false) {
+    currentDisplayedFaculty = faculty;
+    currentReviewOffset = 0; // Reset pagination
+    
     let fullName, initial, email, courses, teaching, marking, behavior, overallSummary, statisticalInsights;
     
     if (faculty.faculty_reviews) {
@@ -693,6 +1105,34 @@ function displayFaculty(faculty, keepRatingCard = false) {
     const courseTags = courseArray.map(course => 
         `<span style="display: inline-block; background: var(--input-bg); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.75rem; margin-right: 0.5rem; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">${escapeHtml(course)}</span>`
     ).join('');
+    
+    // Load initial reviews (first 5)
+    const { reviews: studentReviews, total, hasMore } = await loadStudentReviews(faculty.id, 5, 0);
+    
+    // Generate student reviews HTML
+    let studentReviewsHTML = '';
+    if (studentReviews.length > 0 || total > 0) {
+        const reviewCardsHTML = generateReviewCards(studentReviews);
+        const loadMoreButton = hasMore ? `
+            <div style="text-align: center; margin-top: 1rem;">
+                <button class="load-more-reviews-btn" onclick="loadMoreReviews(${faculty.id})">
+                    Load More Reviews (${total - 5} remaining)
+                </button>
+            </div>
+        ` : '';
+        
+        studentReviewsHTML = `
+            <div class="student-reviews-section">
+                <span class="reviews-header">Student Reviews (${total})</span>
+                <div id="reviews-container-${faculty.id}">
+                    ${reviewCardsHTML}
+                </div>
+                <div id="load-more-container-${faculty.id}">
+                    ${loadMoreButton}
+                </div>
+            </div>
+        `;
+    }
 
     facultyReviewArea.innerHTML = `
         <div class="card slide-up" style="z-index: 1 !important;">
@@ -731,28 +1171,44 @@ function displayFaculty(faculty, keepRatingCard = false) {
                     <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1rem; font-weight: 600; letter-spacing: 0.5px;">What Students Say</span>
                     ${parseInsights(statisticalInsights)}
                     
-                    <div class="consensus-pill-wrapper">
-                        <div class="vote-pill">
-                            <div class="vote-section" id="vote-up-${faculty.id}" onclick="handleVote(${faculty.id}, 'up')">
-                                <span class="vote-text">Agree</span>
-                                <svg class="arrow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 4l-8 8h5v8h6v-8h5z"/>
-                                </svg>
+                    <div class="vote-and-review-row">
+                        <div class="button-group-centered">
+                            <div class="consensus-pill-wrapper">
+                                <div class="vote-pill">
+                                    <div class="vote-section" id="vote-up-${faculty.id}" onclick="handleVote(${faculty.id}, 'up')">
+                                        <span class="vote-text">Agree</span>
+                                        <svg class="arrow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 4l-8 8h5v8h6v-8h5z"/>
+                                        </svg>
+                                    </div>
+                                    
+                                    <span class="vote-counter" id="vote-counter-${faculty.id}">${faculty.vote_score || 0}</span>
+                                    
+                                    <div class="vote-divider"></div>
+                                    
+                                    <div class="vote-section" id="vote-down-${faculty.id}" onclick="handleVote(${faculty.id}, 'down')">
+                                        <svg class="arrow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 20l8-8h-5V4H9v8H4z"/>
+                                        </svg>
+                                        <span class="vote-text">Disagree</span>
+                                    </div>
+                                </div>
                             </div>
                             
-                            <span class="vote-counter" id="vote-counter-${faculty.id}">${faculty.vote_score || 0}</span>
-                            
-                            <div class="vote-divider"></div>
-                            
-                            <div class="vote-section" id="vote-down-${faculty.id}" onclick="handleVote(${faculty.id}, 'down')">
-                                <svg class="arrow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 20l8-8h-5V4H9v8H4z"/>
-                                </svg>
-                                <span class="vote-text">Disagree</span>
+                            <div class="action-buttons-group">
+                                <div class="add-review-button" onclick="openReviewModal(${faculty.id}, '${escapeHtml(fullName).replace(/'/g, "\\'")}')">
+                                    <span class="comment-icon">+</span>
+                                    <span>Add Review</span>
+                                </div>
+                                <button class="share-link-btn-new" onclick="handleShareLink(${faculty.id}, '${escapeHtml(fullName).replace(/'/g, "\\'")}')">
+                                    Invite Review
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
+                
+                ${studentReviewsHTML}
             </div>
             
             <div class="card-footer">
@@ -761,7 +1217,6 @@ function displayFaculty(faculty, keepRatingCard = false) {
                 </div>
                 <div class="coffee-trigger" onclick="openSupportCard()">
                     <span class="coffee-icon">☕</span>
-                    
                 </div>
             </div>
         </div>
@@ -783,8 +1238,88 @@ function displayFaculty(faculty, keepRatingCard = false) {
     }, 100);
 }
 
+// Helper function to generate review cards HTML
+function generateReviewCards(reviews) {
+    return reviews.map(review => `
+        <div class="student-review-card">
+            <div class="review-header">
+                <span>Anonymous</span>
+                ${review.course_code ? `<span class="review-course-badge">${escapeHtml(review.course_code)}</span>` : ''}
+                <span>•</span>
+                <span>${formatTimeAgo(review.created_at)}</span>
+            </div>
+            <div class="review-ratings-row">
+                <div class="rating-line-modern">
+                    <div class="rating-line-header">
+                        <span class="rating-label-modern">Teaching</span>
+                        <span class="rating-number-modern">${review.teaching_rating.toFixed(1)}</span>
+                    </div>
+                    <div class="rating-progress-bar">
+                        <div class="rating-progress-fill" style="width: ${(review.teaching_rating / 10) * 100}%"></div>
+                    </div>
+                </div>
+                <div class="rating-line-modern">
+                    <div class="rating-line-header">
+                        <span class="rating-label-modern">Marking</span>
+                        <span class="rating-number-modern">${review.marking_rating.toFixed(1)}</span>
+                    </div>
+                    <div class="rating-progress-bar">
+                        <div class="rating-progress-fill" style="width: ${(review.marking_rating / 10) * 100}%"></div>
+                    </div>
+                </div>
+                <div class="rating-line-modern">
+                    <div class="rating-line-header">
+                        <span class="rating-label-modern">Behavior</span>
+                        <span class="rating-number-modern">${review.behavior_rating.toFixed(1)}</span>
+                    </div>
+                    <div class="rating-progress-bar">
+                        <div class="rating-progress-fill" style="width: ${(review.behavior_rating / 10) * 100}%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="review-feedback">"${escapeHtml(review.raw_feedback)}"</div>
+        </div>
+    `).join('');
+}
+
+// Load More Reviews Function
+async function loadMoreReviews(facultyId) {
+    currentReviewOffset += 5;
+    
+    const { reviews, total, hasMore } = await loadStudentReviews(facultyId, 5, currentReviewOffset);
+    
+    if (reviews.length > 0) {
+        // Append new reviews to container
+        const container = document.getElementById(`reviews-container-${facultyId}`);
+        const newReviewsHTML = generateReviewCards(reviews);
+        container.insertAdjacentHTML('beforeend', newReviewsHTML);
+        
+        // Update or remove Load More button
+        const loadMoreContainer = document.getElementById(`load-more-container-${facultyId}`);
+        if (hasMore) {
+            const remaining = total - (currentReviewOffset + 5);
+            loadMoreContainer.innerHTML = `
+                <div style="text-align: center; margin-top: 1rem;">
+                    <button class="load-more-reviews-btn" onclick="loadMoreReviews(${facultyId})">
+                        Load More Reviews (${remaining} remaining)
+                    </button>
+                </div>
+            `;
+        } else {
+            loadMoreContainer.innerHTML = `
+                <div style="text-align: center; margin-top: 1rem; color: var(--text-muted); font-size: 0.875rem;">
+                    All reviews loaded
+                </div>
+            `;
+        }
+    }
+}
+
+// Make loadMoreReviews globally accessible
+window.loadMoreReviews = loadMoreReviews;
+
 // ============================================
-// 7. UTILITY FUNCTIONS
+// 8. UTILITY FUNCTIONS
 // ============================================
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -819,7 +1354,7 @@ function formatInsightText(text) {
 }
 
 // ============================================
-// 8. ABOUT CARD FUNCTIONS
+// 9. ABOUT CARD FUNCTIONS
 // ============================================
 function toggleAboutCard() {
     const aboutArea = document.getElementById('aboutArea');
@@ -871,8 +1406,8 @@ function renderAboutCard() {
             </div>
             
             <div class="card-footer">
-                <div><span class="footer-link" onclick="toggleAboutCard()">Disclaimer & Data Notice</span></div>
-                <div class="coffee-trigger" onclick="openSupportCard()"><span class="coffee-icon">☕</span>
+                <div><span class="footer-link" onclick="toggleAboutCard()">Close</span></div>
+                <div class="coffee-trigger" onclick="openSupportCard()"><span class="coffee-icon">☕</span></div>
             </div>
         </div>
     `;
@@ -889,7 +1424,7 @@ function closeAboutCard() {
 window.toggleAboutCard = toggleAboutCard;
 
 // ============================================
-// 12. TOAST NOTIFICATIONS
+// 10. TOAST NOTIFICATIONS
 // ============================================
 function showToast(message, type = 'success') {
     toast.textContent = message;

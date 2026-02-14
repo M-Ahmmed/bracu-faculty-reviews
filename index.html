@@ -51,7 +51,7 @@
                 <div>
                     <span class="footer-text">Built by Mueen</span>
                     <span class="separator">|</span>
-                    <a href="https://www.facebook.com/mueen.ahmmed.7" target="_blank" class="footer-link">Send me feedback 💬</a>
+                    <a href="https://www.facebook.com/mueen.ahmmed.7" target="_blank" class="footer-link">Send me feedback</a>
                 </div>
                 
             </div>
@@ -87,6 +87,108 @@
                     <button class="copy-button" id="copyNumberBtn">Copy Number</button>
                 </div>
                 <p class="support-footer-note">This is optional. Thank you! ☕</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Student Review Modal (iOS Sheet Style) -->
+    <div class="review-modal-backdrop" id="reviewBackdrop">
+        <div class="review-modal-sheet" onclick="event.stopPropagation()">
+            <!-- Email Login Step -->
+            <div class="review-modal-step" id="emailLoginStep">
+                <div class="support-header">
+                    <button class="support-close" id="reviewCloseBtn1">×</button>
+                    <h3 class="support-headline">Sign in with BRACU Email</h3>
+                </div>
+                <div class="support-body">
+                    <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 1rem;">
+                        Your G Suite Email Address is required for verification only. Your identity is never shown with your review.
+                    </p>
+                    <input 
+                        type="email" 
+                        id="reviewEmailInput" 
+                        class="review-input" 
+                        placeholder="your.name@g.bracu.ac.bd"
+                        autocomplete="email"
+                    />
+                    <button class="review-submit-btn" id="emailContinueBtn">Continue</button>
+                </div>
+            </div>
+            
+            <!-- Review Form Step -->
+            <div class="review-modal-step" id="reviewFormStep" style="display: none;">
+                <div class="support-header">
+                    <button class="support-close" id="reviewCloseBtn2">×</button>
+                    <h3 class="support-headline" id="reviewFacultyName">Review Faculty</h3>
+                </div>
+                <div class="support-body">
+                    <!-- Course Code (Optional) -->
+                    <label class="review-label">Course Code (optional)</label>
+                    <input 
+                        type="text" 
+                        id="reviewCourseCode" 
+                        class="review-input" 
+                        placeholder="e.g., CSE110"
+                        style="margin-bottom: 1.5rem;"
+                    />
+                    
+                    <!-- Teaching Quality Slider -->
+                    <label class="review-label">Teaching Quality</label>
+                    <div class="slider-container">
+                        <input 
+                            type="range" 
+                            id="teachingSlider" 
+                            class="rating-slider" 
+                            min="1" 
+                            max="10" 
+                            step="0.5" 
+                            value="5"
+                        />
+                        <span class="slider-value" id="teachingValue">5.0</span>
+                    </div>
+                    
+                    <!-- Marking Fairness Slider -->
+                    <label class="review-label">Marking Fairness</label>
+                    <div class="slider-container">
+                        <input 
+                            type="range" 
+                            id="markingSlider" 
+                            class="rating-slider" 
+                            min="1" 
+                            max="10" 
+                            step="0.5" 
+                            value="5"
+                        />
+                        <span class="slider-value" id="markingValue">5.0</span>
+                    </div>
+                    
+                    <!-- Behavior & Attitude Slider -->
+                    <label class="review-label">Behavior & Attitude</label>
+                    <div class="slider-container">
+                        <input 
+                            type="range" 
+                            id="behaviorSlider" 
+                            class="rating-slider" 
+                            min="1" 
+                            max="10" 
+                            step="0.5" 
+                            value="5"
+                        />
+                        <span class="slider-value" id="behaviorValue">5.0</span>
+                    </div>
+                    
+                    <!-- Feedback Textarea -->
+                    <label class="review-label">Your Experience (3-500 characters)</label>
+                    <textarea 
+                        id="reviewFeedback" 
+                        class="review-textarea" 
+                        placeholder="Share your experience with this faculty member..."
+                        maxlength="500"
+                    ></textarea>
+                    <div class="char-counter" id="charCounter">0/500</div>
+                    
+                    <button class="review-submit-btn" id="submitReviewBtn">Submit Review</button>
+                </div>
             </div>
         </div>
     </div>
