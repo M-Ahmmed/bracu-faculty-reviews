@@ -1557,70 +1557,459 @@ body::before {
 }
 
 /* ============================================
-   PERFORMANCE OPTIMIZED MOBILE STYLES
+   PREMIUM MOBILE DARK MODE - MULTI-MILLION DOLLAR AESTHETIC
    ============================================ */
 
 @media (max-width: 480px) {
-    /* 1. Remove the heavy background image for old GPUs */
+    /* Premium Dark Mode Color System */
+    :root {
+        --mobile-bg-deep: #000000;
+        --mobile-bg-elevated: #0f0f0f;
+        --mobile-bg-card: #1a1a1a;
+        --mobile-text-primary: #ffffff;
+        --mobile-text-secondary: #e0e0e0;
+        --mobile-text-muted: #a0a0a0;
+        --mobile-border-subtle: rgba(255, 255, 255, 0.08);
+        --mobile-border-medium: rgba(255, 255, 255, 0.12);
+        --mobile-border-strong: rgba(255, 255, 255, 0.18);
+    }
+
+    /* 1. Deep Black Background - Premium Feel */
     body {
-        background: #141414 !important;
+        background: var(--mobile-bg-deep) !important;
         animation: none !important;
         padding: 0;
     }
 
-    body::before, .background-mesh {
+    body::before, 
+    .background-mesh {
         display: none !important;
     }
 
-    /* 2. Kill Backdrop Blur - This is the biggest lag saver */
-    .card, .support-card, .support-backdrop, .toast, .vote-pill, 
-    .review-modal-backdrop, .review-modal-sheet, .add-review-button {
+    /* 2. Elevated Cards - Darker with Crisp Borders */
+    .card {
+        background: var(--mobile-bg-card) !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        background: rgba(30, 30, 30, 1) !important;
+        border: 1px solid var(--mobile-border-medium) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9) !important;
     }
-
-    /* 3. Simplify Shadows */
-    .card {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    /* 4. Disable Non-Essential Animations */
-    .status-dot.active {
-        animation: none !important;
-        opacity: 1;
-    }
-
-    .insight-point:hover::before {
-        animation: none !important;
-    }
-
-    .headline {
-        animation: none !important;
-        transform: none !important;
-    }
-
-    /* Keep layout functional but flat */
-    .container { padding: 12px; }
-    .card-content { padding: 15px; }
     
-    /* Mobile slider adjustments */
+    /* 3. Maximum Text Contrast - Professional Readability */
+    .headline,
+    .result-card-headline {
+        color: var(--mobile-text-primary) !important;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8) !important;
+        font-weight: 800 !important;
+    }
+    
+    .description,
+    .footer-text {
+        color: var(--mobile-text-secondary) !important;
+    }
+    
+    .source-line,
+    .footer-link {
+        color: var(--mobile-text-muted) !important;
+    }
+    
+    /* 4. Input Fields - Dark with High Contrast */
+    .search-input-wrapper {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-color: var(--mobile-border-strong) !important;
+    }
+    
+    .search-input {
+        color: var(--mobile-text-primary) !important;
+        font-weight: 500 !important;
+    }
+    
+    .search-input::placeholder {
+        color: var(--mobile-text-muted) !important;
+        opacity: 1 !important;
+    }
+    
+    /* 5. Premium Review Cards - Eye-Catching */
+    .student-review-card {
+        background: var(--mobile-bg-elevated) !important;
+        border: 1px solid var(--mobile-border-medium) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        box-shadow: 
+            0 4px 16px rgba(0, 0, 0, 0.8),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+        animation: none;
+    }
+    
+    .student-review-card:active {
+        background: rgba(30, 30, 30, 1) !important;
+        transform: scale(0.98);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.9) !important;
+    }
+    
+    /* 6. Crystal Clear Review Text */
+    .review-feedback {
+        color: var(--mobile-text-secondary) !important;
+        font-weight: 400 !important;
+        line-height: 1.8 !important;
+    }
+    
+    .review-header {
+        color: var(--mobile-text-muted) !important;
+    }
+    
+    .review-course-badge {
+        background: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        color: var(--mobile-text-primary) !important;
+        font-weight: 700 !important;
+    }
+    
+    /* 7. High-Contrast Rating Labels */
+    .rating-label-modern {
+        color: var(--mobile-text-muted) !important;
+        font-weight: 700 !important;
+    }
+    
+    .rating-number-modern {
+        color: var(--mobile-text-primary) !important;
+        font-weight: 900 !important;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6) !important;
+    }
+    
+    /* 8. Bright Progress Bars - Pure White */
+    .rating-progress-bar {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .rating-progress-fill {
+        background: linear-gradient(90deg, 
+            rgba(255, 255, 255, 0.95) 0%, 
+            rgba(255, 255, 255, 1) 50%, 
+            rgba(255, 255, 255, 0.95) 100%
+        ) !important;
+        box-shadow: 
+            0 0 12px rgba(255, 255, 255, 0.4),
+            0 1px 3px rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    .rating-progress-fill::after {
+        display: none; /* Remove shimmer for performance */
+    }
+    
+    /* 9. Premium Buttons - Elevated Design */
+    .vote-pill,
+    .add-review-button,
+    .share-link-btn-new,
+    .load-more-reviews-btn {
+        background: var(--mobile-bg-elevated) !important;
+        border: 1px solid var(--mobile-border-medium) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        color: var(--mobile-text-primary) !important;
+        font-weight: 700 !important;
+        box-shadow: 
+            0 2px 8px rgba(0, 0, 0, 0.6),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+    }
+    
+    .vote-pill:active,
+    .add-review-button:active,
+    .share-link-btn-new:active,
+    .load-more-reviews-btn:active {
+        background: rgba(40, 40, 40, 1) !important;
+        transform: scale(0.96);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.8) !important;
+    }
+    
+    /* 10. Darker Modal Sheets - Professional */
+    .support-card,
+    .review-modal-sheet {
+        background: var(--mobile-bg-card) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        border-top: 1px solid var(--mobile-border-strong) !important;
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.9) !important;
+    }
+    
+    .support-backdrop,
+    .review-modal-backdrop {
+        background: rgba(0, 0, 0, 0.92) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+    
+    /* 11. High-Contrast Input Fields */
+    .review-input,
+    .review-textarea {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--mobile-border-medium) !important;
+        color: var(--mobile-text-primary) !important;
+        font-weight: 500 !important;
+    }
+    
+    .review-input:focus,
+    .review-textarea:focus {
+        border-color: rgba(255, 255, 255, 0.3) !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05) !important;
+    }
+    
+    .review-input::placeholder,
+    .review-textarea::placeholder {
+        color: var(--mobile-text-muted) !important;
+        opacity: 1 !important;
+    }
+    
+    /* 12. Crisp Toast Notifications */
+    .toast {
+        background: var(--mobile-bg-elevated) !important;
+        border: 1px solid var(--mobile-border-strong) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        color: var(--mobile-text-primary) !important;
+        font-weight: 600 !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.9) !important;
+    }
+    
+    /* 13. Elevated Card Sections */
+    .ratings-grid > div {
+        background: var(--mobile-bg-elevated) !important;
+        border: 1px solid var(--mobile-border-subtle) !important;
+    }
+    
+    .ratings-grid > div > span:last-child {
+        font-weight: 900 !important;
+    }
+    
+    /* 14. Strong Accent Borders */
+    .verdict-box {
+        border-left-color: rgba(255, 255, 255, 0.8) !important;
+        border-left-width: 3px !important;
+    }
+    
+    .insight-point {
+        border-left-color: var(--mobile-border-medium) !important;
+    }
+    
+    .insight-point::before {
+        background: rgba(255, 255, 255, 0.9) !important;
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.3) !important;
+    }
+    
+    /* 15. Premium Card Headers/Footers */
+    .card-header {
+        border-bottom: 1px solid var(--mobile-border-medium) !important;
+        background: var(--mobile-bg-elevated) !important;
+    }
+    
+    .card-footer {
+        background: var(--mobile-bg-deep) !important;
+        border-top: 1px solid var(--mobile-border-medium) !important;
+    }
+    
+    /* 16. Enhanced Leaderboard */
+    .faculty-row {
+        border-bottom: 1px solid var(--mobile-border-subtle) !important;
+    }
+    
+    .faculty-row:active {
+        background: var(--mobile-bg-elevated) !important;
+    }
+    
+    .faculty-name-top {
+        color: var(--mobile-text-primary) !important;
+        font-weight: 700 !important;
+    }
+    
+    .faculty-initial-badge-inline {
+        font-weight: 900 !important;
+        box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2) !important;
+    }
+    
+    /* 17. Sharp Rating Bars */
+    .rating-bar-container {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .rating-bar-fill {
+        background: var(--mobile-text-primary) !important;
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.4) !important;
+    }
+    
+    /* 18. Crisp Autocomplete */
+    .suggestions-dropdown {
+        background: var(--mobile-bg-card) !important;
+        border: 1px solid var(--mobile-border-strong) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9) !important;
+    }
+    
+    .suggestion-item {
+        border-bottom: 1px solid var(--mobile-border-subtle) !important;
+    }
+    
+    .suggestion-item:active {
+        background: var(--mobile-bg-elevated) !important;
+    }
+    
+    .suggestion-name {
+        color: var(--mobile-text-primary) !important;
+        font-weight: 600 !important;
+    }
+    
+    .suggestion-badge {
+        font-weight: 900 !important;
+        box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15) !important;
+    }
+    
+    /* 19. Premium Search Button */
+    .search-button {
+        font-weight: 900 !important;
+        box-shadow: 
+            0 4px 16px rgba(255, 255, 255, 0.15),
+            0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* 20. Enhanced Vote Indicators */
+    .vote-section.up-active .vote-text,
+    .vote-section.up-active .arrow-icon {
+        color: #4ade80 !important;
+        fill: #4ade80 !important;
+        font-weight: 800 !important;
+    }
+    
+    .vote-section.down-active .vote-text,
+    .vote-section.down-active .arrow-icon {
+        color: #ff6b6b !important;
+        fill: #ff6b6b !important;
+        font-weight: 800 !important;
+    }
+    
+    .vote-counter {
+        font-weight: 900 !important;
+    }
+    
+    /* 21. Sharp Modal Elements */
+    .support-close {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    }
+    
+    .support-headline {
+        font-weight: 800 !important;
+    }
+    
+    .number-glass-container {
+        background: var(--mobile-bg-elevated) !important;
+        border: 1px solid var(--mobile-border-medium) !important;
+    }
+    
+    .phone-number {
+        font-weight: 900 !important;
+        text-shadow: 0 2px 8px rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    .copy-button {
+        font-weight: 900 !important;
+        box-shadow: 
+            0 4px 16px rgba(255, 255, 255, 0.15),
+            0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    .payment-badge {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        font-weight: 700 !important;
+    }
+    
+    /* 22. Enhanced Slider */
     .rating-slider {
         height: 8px;
+        background: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08);
     }
     
     .rating-slider::-webkit-slider-thumb {
         width: 24px;
         height: 24px;
+        box-shadow: 
+            0 4px 12px rgba(0, 0, 0, 0.6), 
+            0 0 0 3px rgba(255, 255, 255, 0.1) !important;
     }
     
     .rating-slider::-moz-range-thumb {
         width: 24px;
         height: 24px;
+        box-shadow: 
+            0 4px 12px rgba(0, 0, 0, 0.6), 
+            0 0 0 3px rgba(255, 255, 255, 0.1) !important;
     }
     
-    /* Vote and review row stack on mobile */
+    .slider-value {
+        font-weight: 900 !important;
+    }
+    
+    /* 23. Character Counter Enhancement */
+    .char-counter {
+        font-weight: 600 !important;
+        color: var(--mobile-text-muted) !important;
+    }
+    
+    /* 24. Submit Button - Maximum Impact */
+    .review-submit-btn {
+        font-weight: 900 !important;
+        box-shadow: 
+            0 4px 16px rgba(255, 255, 255, 0.15),
+            0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* 25. Initial Badge Enhancement */
+    .initial-badge {
+        font-weight: 900 !important;
+        box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15) !important;
+    }
+    
+    /* 26. Status Indicator */
+    .status-dot.active {
+        animation: none !important;
+        opacity: 1;
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.6) !important;
+    }
+    
+    .status-text {
+        font-weight: 700 !important;
+    }
+    
+    /* 27. Percentage Highlights */
+    .percentage {
+        font-weight: 900 !important;
+        text-shadow: 0 1px 4px rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Keep layout functional */
+    .container { padding: 12px; }
+    .card-content { padding: 15px; }
+    
+    /* Disable hover effects on mobile */
+    .student-review-card:hover {
+        transform: none;
+        box-shadow: 
+            0 4px 16px rgba(0, 0, 0, 0.8),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+    }
+    
+    .insight-point:hover::before {
+        animation: none !important;
+    }
+    
+    .headline {
+        animation: none !important;
+        transform: none !important;
+    }
+    
+    /* Button group layout */
     .vote-and-review-row {
         flex-direction: column;
         align-items: stretch;
@@ -1642,7 +2031,8 @@ body::before {
     }
     
     .add-review-button,
-    .share-link-btn-new {
+    .share-link-btn-new,
+    .load-more-reviews-btn {
         width: 100%;
         justify-content: center;
     }
