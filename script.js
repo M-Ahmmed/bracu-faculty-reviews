@@ -1,407 +1,245 @@
-// ============================================
-// 1. SUPABASE CONFIGURATION
-// ============================================
-const supabaseUrl = 'https://mbmgmqignuqgixsabkwv.supabase.co'; 
-const supabaseKey = 'sb_publishable_sUnVlxyJ0hNbb6qn6KJDwg_PVpp_39b'; 
+/* ════════════════════════════════════════════════
+   BRACU FACULTY REVIEWS — script.js
+   ════════════════════════════════════════════════ */
 
-// We will use '_supabase' everywhere to be consistent
+// ── 1. SUPABASE CONFIG ──
+const supabaseUrl = 'https://mbmgmqignuqgixsabkwv.supabase.co';
+const supabaseKey = 'sb_publishable_sUnVlxyJ0hNbb6qn6KJDwg_PVpp_39b';
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-// ============================================
-// 2. DOM ELEMENT SELECTION
-// ============================================
-const searchForm = document.getElementById('searchForm');
-const searchInput = document.getElementById('searchInput');
-const searchButton = document.getElementById('searchButton');
+// ── 2. DOM REFS ──
+const searchForm      = document.getElementById('searchForm');
+const searchInput     = document.getElementById('searchInput');
+const searchButton    = document.getElementById('searchButton');
 const courseRatingArea = document.getElementById('courseRatingArea');
 const facultyReviewArea = document.getElementById('facultyReviewArea');
-const spinner = document.getElementById('spinner');
-const toast = document.getElementById('toast');
-
-// Coffee support elements
+const spinner         = document.getElementById('spinner');
+const toastEl         = document.getElementById('toast');
 const supportBackdrop = document.getElementById('supportBackdrop');
 const supportCloseBtn = document.getElementById('supportCloseBtn');
-const copyNumberBtn = document.getElementById('copyNumberBtn');
-
-// Student review modal elements
-const reviewBackdrop = document.getElementById('reviewBackdrop');
-const emailLoginStep = document.getElementById('emailLoginStep');
-const reviewFormStep = document.getElementById('reviewFormStep');
+const copyNumberBtn   = document.getElementById('copyNumberBtn');
+const reviewBackdrop  = document.getElementById('reviewBackdrop');
+const emailLoginStep  = document.getElementById('emailLoginStep');
+const reviewFormStep  = document.getElementById('reviewFormStep');
 const reviewCloseBtn1 = document.getElementById('reviewCloseBtn1');
 const reviewCloseBtn2 = document.getElementById('reviewCloseBtn2');
 const emailContinueBtn = document.getElementById('emailContinueBtn');
 const reviewEmailInput = document.getElementById('reviewEmailInput');
-const teachingSlider = document.getElementById('teachingSlider');
-const markingSlider = document.getElementById('markingSlider');
-const behaviorSlider = document.getElementById('behaviorSlider');
-const teachingValue = document.getElementById('teachingValue');
-const markingValue = document.getElementById('markingValue');
-const behaviorValue = document.getElementById('behaviorValue');
-const reviewFeedback = document.getElementById('reviewFeedback');
-const charCounter = document.getElementById('charCounter');
+const teachingSlider  = document.getElementById('teachingSlider');
+const markingSlider   = document.getElementById('markingSlider');
+const behaviorSlider  = document.getElementById('behaviorSlider');
+const teachingValue   = document.getElementById('teachingValue');
+const markingValue    = document.getElementById('markingValue');
+const behaviorValue   = document.getElementById('behaviorValue');
+const reviewFeedback  = document.getElementById('reviewFeedback');
+const charCounter     = document.getElementById('charCounter');
 const submitReviewBtn = document.getElementById('submitReviewBtn');
 const reviewFacultyName = document.getElementById('reviewFacultyName');
-const reviewCourseCode = document.getElementById('reviewCourseCode');
+const reviewCourseCode  = document.getElementById('reviewCourseCode');
 
-// Store current course code and faculty globally
-let currentCourseCode = null;
-let currentCourseData = null;
+let currentCourseCode  = null;
 let currentFacultyForReview = null;
+let currentReviewOffset = 0;
+let currentDisplayedFaculty = null;
 
-// ============================================
-// 3. HARDCODED DARK MODE - THEME SWITCHER REMOVED
-// ============================================
-// Always dark mode - no localStorage or theme toggle
-document.documentElement.setAttribute('data-theme', 'dark');
+// ── 3. TYPEWRITER ──
+const typewriterEl = document.getElementById('typewriterText');
+const HEADLINE = "Find your faculty.";
+let charIdx = 0;
 
-// ============================================
-// 3.5 TYPEWRITER ANIMATION
-// ============================================
-const typewriterText = document.getElementById('typewriterText');
-const text = "Find your faculty review";
-let charIndex = 0;
-
-function typeWriter() {
-    if (charIndex < text.length) {
-        typewriterText.innerHTML = text.substring(0, charIndex + 1) + '<span class="terminal-cursor"></span>';
-        charIndex++;
-        setTimeout(typeWriter, 50);
-    } else {
-        typewriterText.innerHTML = text + '<span class="terminal-cursor"></span>';
+(function typeLoop() {
+    if (charIdx <= HEADLINE.length) {
+        typewriterEl.innerHTML =
+            HEADLINE.substring(0, charIdx) +
+            '<span class="cursor-blink"></span>';
+        charIdx++;
+        setTimeout(typeLoop, charIdx === 1 ? 400 : 55);
     }
+})();
+
+// ── 4. RATING HELPERS ──
+function getScoreClass(score) {
+    const s = parseFloat(score);
+    if (isNaN(s)) return '';
+    if (s >= 8)   return 'c-green';
+    if (s >= 6.5) return 'c-yellow';
+    if (s >= 5)   return 'c-orange';
+    return 'c-red';
 }
 
-setTimeout(typeWriter, 300);
-
-// ============================================
-// 3.6 COFFEE SUPPORT HANDLERS
-// ============================================
-function openSupportCard() {
-    supportBackdrop.classList.add('show');
-    document.body.style.overflow = 'hidden';
+function getReviewAccentColor(avg) {
+    if (avg >= 8)   return 'var(--green)';
+    if (avg >= 6.5) return 'var(--yellow)';
+    if (avg >= 5)   return 'var(--orange)';
+    return 'var(--red)';
 }
 
-function closeSupportCard() {
-    supportBackdrop.classList.remove('show');
-    document.body.style.overflow = '';
+function getVerdictInfo(teaching, marking, behavior) {
+    const scores = [teaching, marking, behavior]
+        .map(s => parseFloat(s))
+        .filter(s => !isNaN(s) && s > 0);
+    if (!scores.length) return null;
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    if (avg >= 8)   return { label: 'Highly Recommended', cls: 'verdict--green' };
+    if (avg >= 6.5) return { label: 'Generally Positive',  cls: 'verdict--yellow' };
+    if (avg >= 5)   return { label: 'Mixed Reviews',        cls: 'verdict--orange' };
+    return           { label: 'Proceed with Caution',       cls: 'verdict--red' };
 }
 
-async function copyPhoneNumber() {
-    try {
-        await navigator.clipboard.writeText('01908341690');
-        copyNumberBtn.textContent = '✓ Copied';
-        copyNumberBtn.classList.add('copied');
-        
-        setTimeout(() => {
-            copyNumberBtn.textContent = 'Copy Number';
-            copyNumberBtn.classList.remove('copied');
-        }, 2000);
-    } catch (err) {
-        console.error('Copy failed:', err);
-        showToast('Failed to copy number', 'error');
-    }
-}
-
-// Event listeners for coffee support
-supportCloseBtn.addEventListener('click', closeSupportCard);
-copyNumberBtn.addEventListener('click', copyPhoneNumber);
-
-// Click outside to close
-supportBackdrop.addEventListener('click', (e) => {
-    if (e.target === supportBackdrop) {
-        closeSupportCard();
-    }
-});
-
-// ESC key to close
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        if (supportBackdrop.classList.contains('show')) {
-            closeSupportCard();
-        }
-        if (reviewBackdrop.classList.contains('show')) {
-            closeReviewModal();
-        }
-    }
-});
-
-// Make openSupportCard globally accessible for onclick handlers
-window.openSupportCard = openSupportCard;
-
-// ============================================
-// 4. FUZZY SEARCH WITH FUSE.JS
-// ============================================
+// ── 5. DATA LOADING ──
 let allFaculty = [];
 let fuse = null;
 
 async function loadFacultyData() {
     try {
-        const { data, error } = await _supabase
-            .from('faculty_reviews')
-            .select('*');
-        
+        const { data, error } = await _supabase.from('faculty_reviews').select('*');
         if (error) throw error;
-        
         allFaculty = data || [];
-        
-        const searchableData = allFaculty.map(faculty => {
-            if (faculty.faculty_reviews) {
-                const parts = faculty.faculty_reviews.split('|');
-                const fullName = parts[0]?.trim() || "";
-                const initial = parts[1]?.trim() || "";
-                const courses = parts[3]?.trim() || "";
-                
-                return {
-                    ...faculty,
-                    fullName: fullName,
-                    initial: initial,
-                    courses: courses,
-                    searchableText: `${fullName} ${initial} ${faculty.faculty_name || ''}`
-                };
-            }
+
+        const searchable = allFaculty.map(f => {
+            if (!f.faculty_reviews) return { ...f, fullName: '', initial: '', courses: '' };
+            const parts = f.faculty_reviews.split('|');
             return {
-                ...faculty,
-                fullName: "",
-                initial: "",
-                courses: "",
-                searchableText: faculty.faculty_name || ""
+                ...f,
+                fullName: parts[0]?.trim() || '',
+                initial:  parts[1]?.trim() || '',
+                courses:  parts[3]?.trim() || '',
             };
         });
-        
-        fuse = new Fuse(searchableData, {
+
+        fuse = new Fuse(searchable, {
             keys: [
-                { name: 'fullName', weight: 0.5 },
-                { name: 'initial', weight: 0.3 },
-                { name: 'faculty_name', weight: 0.2 }
+                { name: 'fullName', weight: 0.6 },
+                { name: 'initial',  weight: 0.3 },
+                { name: 'faculty_name', weight: 0.1 },
             ],
             threshold: 0.4,
             ignoreLocation: true,
             minMatchCharLength: 2,
-            useExtendedSearch: true,
-            includeScore: true
+            includeScore: true,
         });
-        
-        console.log(`Loaded ${allFaculty.length} faculty records`);
+
+        checkUrlParams();
     } catch (err) {
-        console.error('Error loading faculty data:', err);
+        console.error('loadFacultyData:', err);
     }
 }
 
 loadFacultyData();
 
-// ============================================
-// 4.5 AUTOCOMPLETE SUGGESTIONS
-// ============================================
+// ── 6. AUTOCOMPLETE ──
+const acDropdown = document.getElementById('suggestions-dropdown');
 let debounceTimer = null;
-let suggestionsContainer = null;
 
-function createSuggestionsContainer() {
-    const wrapper = document.querySelector('.search-input-wrapper');
-    
-    if (!document.getElementById('suggestions-dropdown')) {
-        suggestionsContainer = document.createElement('div');
-        suggestionsContainer.id = 'suggestions-dropdown';
-        suggestionsContainer.className = 'suggestions-dropdown';
-        wrapper.appendChild(suggestionsContainer);
-    }
-}
+searchInput.addEventListener('input', e => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => showSuggestions(e.target.value.trim()), 200);
+});
 
-createSuggestionsContainer();
+document.addEventListener('click', e => {
+    if (!searchInput.contains(e.target) && !acDropdown.contains(e.target)) hideAC();
+});
+
+searchInput.addEventListener('keydown', e => {
+    if (e.key === 'Escape') hideAC();
+});
+
+searchForm.addEventListener('submit', () => hideAC(), true);
 
 function showSuggestions(query) {
-    const cleanQuery = query.trim();
-    if (!cleanQuery || cleanQuery.length < 2) {
-        hideSuggestions();
-        return;
-    }
-
-    const exactInitialMatch = allFaculty.filter(f => 
-        (f.initial || "").toLowerCase() === cleanQuery.toLowerCase()
-    );
-
-    const hasNumber = /\d/.test(cleanQuery);
-    const courseCodePattern = /^[A-Z]{3,4}\s?\d{0,3}$/i;
-    
-    if (hasNumber && courseCodePattern.test(cleanQuery)) {
-        showCourseCodeSuggestions(cleanQuery.toUpperCase().replace(/\s/g, ''));
+    if (!query || query.length < 2) { hideAC(); return; }
+    const coursePattern = /^[A-Z]{3,4}\s?\d{1,3}$/i;
+    if (/\d/.test(query) && coursePattern.test(query)) {
+        showCourseAC(query.toUpperCase().replace(/\s/g, ''));
     } else {
-        showFacultyNameSuggestions(cleanQuery, exactInitialMatch);
+        showFacultyAC(query);
     }
 }
 
-function showCourseCodeSuggestions(query) {
-    const allCourseCodes = new Set();
-    
-    allFaculty.forEach(faculty => {
-        if (faculty.faculty_reviews) {
-            const parts = faculty.faculty_reviews.split('|');
-            const courses = parts[3]?.trim() || "";
-            if (courses) {
-                courses.split(',').forEach(course => {
-                    const trimmed = course.trim();
-                    if (trimmed) allCourseCodes.add(trimmed);
-                });
-            }
-        }
+function showCourseAC(query) {
+    const codes = new Set();
+    allFaculty.forEach(f => {
+        if (!f.faculty_reviews) return;
+        const courses = f.faculty_reviews.split('|')[3]?.trim() || '';
+        courses.split(',').forEach(c => { const t = c.trim(); if (t) codes.add(t); });
     });
-    
-    const matchingCourses = Array.from(allCourseCodes)
-        .filter(code => code.startsWith(query))
-        .sort()
-        .slice(0, 5);
-    
-    if (matchingCourses.length === 0) {
-        hideSuggestions();
-        return;
-    }
-    
-    const suggestionsHTML = matchingCourses.map((course, index) => `
-        <div class="suggestion-item course-suggestion" data-course="${escapeHtml(course)}" data-index="${index}">
-            <span class="suggestion-name">${escapeHtml(course)}</span>
-            <span class="suggestion-badge">COURSE</span>
+    const matches = [...codes].filter(c => c.startsWith(query)).sort().slice(0, 5);
+    if (!matches.length) { hideAC(); return; }
+    renderAC(matches.map(c => ({
+        label: c,
+        badge: 'COURSE',
+        onClick: () => { searchInput.value = c; hideAC(); searchForm.dispatchEvent(new Event('submit')); }
+    })));
+}
+
+function showFacultyAC(query) {
+    if (!fuse) return;
+    const exact = allFaculty.filter(f => (f.initial || '').toLowerCase() === query.toLowerCase());
+    const results = fuse.search(query.toLowerCase());
+    const map = new Map();
+    exact.forEach(f => map.set(f.id, { item: { ...f, fullName: f.faculty_reviews?.split('|')[0]?.trim() || '' }, score: 0 }));
+    results.forEach(r => { if (!map.has(r.item.id) && r.score < 0.5) map.set(r.item.id, r); });
+    const final = [...map.values()].slice(0, 5);
+    if (!final.length) { hideAC(); return; }
+    renderAC(final.map(r => {
+        const name = r.item.fullName || r.item.faculty_name || 'Unknown';
+        const init = r.item.initial || '';
+        return {
+            label: name,
+            badge: init,
+            onClick: () => { searchInput.value = name; hideAC(); searchForm.dispatchEvent(new Event('submit')); }
+        };
+    }));
+}
+
+function renderAC(items) {
+    acDropdown.innerHTML = items.map((item, i) => `
+        <div class="ac-item" data-idx="${i}">
+            <span class="ac-name">${escHtml(item.label)}</span>
+            ${item.badge ? `<span class="ac-badge">${escHtml(item.badge)}</span>` : ''}
         </div>
     `).join('');
-    
-    suggestionsContainer.innerHTML = suggestionsHTML;
-    suggestionsContainer.style.display = 'block';
-    
-    document.querySelectorAll('.course-suggestion').forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const selectedCourse = e.currentTarget.getAttribute('data-course');
-            searchInput.value = selectedCourse;
-            hideSuggestions();
-            searchForm.dispatchEvent(new Event('submit'));
-        });
+    acDropdown.querySelectorAll('.ac-item').forEach((el, i) => {
+        el.addEventListener('click', e => { e.preventDefault(); items[i].onClick(); });
     });
+    acDropdown.style.display = 'block';
 }
 
-function showFacultyNameSuggestions(query, manualMatches = []) {
-    const queryLower = query.toLowerCase();
-    
-    const results = fuse.search(queryLower);
-    
-    const combinedMap = new Map();
-    
-    manualMatches.forEach(f => {
-        combinedMap.set(f.faculty_id || f.fullName, { item: f, score: 0 });
-    });
-    
-    results.forEach(result => {
-        const id = result.item.faculty_id || result.item.fullName;
-        if (!combinedMap.has(id) && result.score < 0.5) {
-            combinedMap.set(id, result);
-        }
-    });
-
-    const finalResults = Array.from(combinedMap.values()).slice(0, 5);
-
-    if (finalResults.length === 0) {
-        hideSuggestions();
-        return;
-    }
-
-    const suggestionsHTML = finalResults.map((result) => {
-        const faculty = result.item;
-        const fullName = faculty.fullName || faculty.faculty_name || "Unknown";
-        const initial = faculty.initial || "";
-        
-        return `
-            <div class="suggestion-item" data-name="${escapeHtml(fullName)}">
-                <span class="suggestion-name">${escapeHtml(fullName)}</span>
-                ${initial ? `<span class="suggestion-badge">${escapeHtml(initial)}</span>` : ''}
-            </div>
-        `;
-    }).join('');
-
-    suggestionsContainer.innerHTML = suggestionsHTML;
-    suggestionsContainer.style.display = 'block';
-
-    document.querySelectorAll('.suggestion-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            const selectedName = e.currentTarget.getAttribute('data-name');
-            searchInput.value = selectedName;
-            hideSuggestions();
-            searchForm.dispatchEvent(new Event('submit'));
-        });
-    });
+function hideAC() {
+    acDropdown.style.display = 'none';
+    acDropdown.innerHTML = '';
 }
 
-function hideSuggestions() {
-    if (suggestionsContainer) {
-        suggestionsContainer.style.display = 'none';
-        suggestionsContainer.innerHTML = '';
-    }
-}
-
-searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.trim();
-    
-    if (debounceTimer) {
-        clearTimeout(debounceTimer);
-    }
-    
-    debounceTimer = setTimeout(() => {
-        showSuggestions(query);
-    }, 200);
-});
-
-document.addEventListener('click', (e) => {
-    if (!searchInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
-        hideSuggestions();
-    }
-});
-
-searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        hideSuggestions();
-    }
-});
-
-searchForm.addEventListener('submit', () => {
-    hideSuggestions();
-}, true);
-
-// ============================================
-// 5. SEARCH FUNCTIONALITY WITH COURSE CODE DETECTION
-// ============================================
-searchForm.addEventListener('submit', async (e) => {
+// ── 7. SEARCH FORM ──
+searchForm.addEventListener('submit', async e => {
     e.preventDefault();
-    hideSuggestions();
-    
-    const userInput = searchInput.value.trim();
-    if (!userInput) {
-        alert('Please enter a faculty name or course code');
-        return;
-    }
+    hideAC();
+    const raw = searchInput.value.trim();
+    if (!raw) return;
 
     searchButton.disabled = true;
     searchButton.classList.add('loading');
-    
+
     try {
-        const courseCodePattern = /^[A-Z]{3,4}\s?\d{3}$/i;
-        const isCourseCode = courseCodePattern.test(userInput);
-        
-        if (isCourseCode) {
-            await handleCourseCodeSearch(userInput.toUpperCase().replace(/\s/g, ''));
+        const coursePattern = /^[A-Z]{3,4}\s?\d{3}$/i;
+        if (coursePattern.test(raw)) {
+            await handleCourseSearch(raw.toUpperCase().replace(/\s/g, ''));
         } else {
-            await handleFacultyNameSearch(userInput);
+            await handleFacultySearch(raw);
         }
     } catch (err) {
-        console.error('Error searching:', err);
-        courseRatingArea.innerHTML = `
+        console.error(err);
+        showResult(courseRatingArea, `
             <div class="card slide-up">
-                <div class="card-content" style="padding: 2rem; text-align: center;">
-                    <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">Error</h3>
-                    <p style="color: var(--text-secondary);">
-                        Something went wrong. Please try again.
-                    </p>
+                <div class="card-body">
+                    <div class="empty-state">
+                        <span class="empty-icon">⚠️</span>
+                        <p class="empty-title">Something went wrong</p>
+                        <p class="empty-desc">Please try again in a moment.</p>
+                    </div>
                 </div>
             </div>
-        `;
-        courseRatingArea.style.display = 'block';
+        `);
         facultyReviewArea.style.display = 'none';
     } finally {
         searchButton.disabled = false;
@@ -409,1029 +247,698 @@ searchForm.addEventListener('submit', async (e) => {
     }
 });
 
-// ============================================
-// 5.1 COURSE CODE SEARCH HANDLER
-// ============================================
-async function handleCourseCodeSearch(courseCode) {
-    console.log(`Searching for course code: ${courseCode}`);
-    
-    currentCourseCode = courseCode;
-    
-    const facultyWithCourse = allFaculty.filter(faculty => {
-        if (faculty.faculty_reviews) {
-            const parts = faculty.faculty_reviews.split('|');
-            const courses = parts[3]?.trim() || "";
-            return courses.includes(courseCode);
-        }
-        return false;
+// ── 8. COURSE CODE SEARCH ──
+async function handleCourseSearch(code) {
+    currentCourseCode = code;
+    const matching = allFaculty.filter(f => {
+        if (!f.faculty_reviews) return false;
+        const courses = f.faculty_reviews.split('|')[3]?.trim() || '';
+        return courses.split(',').map(c => c.trim()).includes(code);
     });
-    
-    if (facultyWithCourse.length === 0) {
-        courseRatingArea.innerHTML = `
+
+    if (!matching.length) {
+        showResult(courseRatingArea, `
             <div class="card slide-up">
-                <div class="card-content" style="padding: 2rem; text-align: center;">
-                    <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1.25rem; font-weight: 700;">No faculty found for "${escapeHtml(courseCode)}"</h3>
-                    <p style="color: var(--text-secondary); line-height: 1.7; font-size: 0.95rem;">
-                        This course might not be in our database yet, or no faculty reviews are available for it.
-                    </p>
+                <div class="card-body">
+                    <div class="empty-state">
+                        <span class="empty-icon">🔍</span>
+                        <p class="empty-title">No faculty found for ${escHtml(code)}</p>
+                        <p class="empty-desc">This course may not be in our database yet. Drop the name in the Facebook comments or hit Feedback.</p>
+                    </div>
                 </div>
             </div>
-        `;
-        courseRatingArea.style.display = 'block';
+        `);
         facultyReviewArea.style.display = 'none';
-        courseRatingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
     }
-    
-    const facultyWithRatings = facultyWithCourse.map(faculty => {
-        const parts = faculty.faculty_reviews.split('|');
-        const fullName = parts[0]?.trim() || "Unknown";
-        const initial = parts[1]?.trim() || "";
-        const teaching = parseFloat(parts[4]) || 0;
-        const marking = parseFloat(parts[5]) || 0;
-        const behavior = parseFloat(parts[6]) || 0;
-        
-        const avgRating = ((teaching + marking + behavior) / 3) / 10 * 100;
-        
-        return {
-            fullName,
-            initial,
-            avgRating: avgRating.toFixed(1),
-            rawData: faculty
-        };
-    });
-    
-    facultyWithRatings.sort((a, b) => parseFloat(b.avgRating) - parseFloat(a.avgRating));
-    
-    currentCourseData = facultyWithRatings;
-    
-    const facultyRowsHTML = facultyWithRatings.map((faculty, index) => `
-        <div class="faculty-row" onclick="searchFaculty('${escapeHtml(faculty.fullName)}')" data-index="${index}">
-            <div class="faculty-column">
-                <div class="faculty-header-inline">
-                    <span class="faculty-name-top">${escapeHtml(faculty.fullName)}</span>
-                    <div class="faculty-initial-badge-inline">${escapeHtml(faculty.initial)}</div>
+
+    const rows = matching.map(f => {
+        const p = f.faculty_reviews.split('|');
+        const name = p[0]?.trim() || 'Unknown';
+        const init = p[1]?.trim() || '';
+        const t = parseFloat(p[4]) || 0;
+        const m = parseFloat(p[5]) || 0;
+        const b = parseFloat(p[6]) || 0;
+        const avg = ((t + m + b) / 3) / 10 * 100;
+        return { name, init, avg: avg.toFixed(1), rawData: f };
+    }).sort((a, b) => parseFloat(b.avg) - parseFloat(a.avg));
+
+    const rowsHTML = rows.map((r, i) => `
+        <div class="faculty-row" onclick="window.searchFaculty('${escHtml(r.name).replace(/'/g, "\\'")}')">
+            <div class="faculty-col">
+                <div class="faculty-row-head">
+                    <span class="faculty-row-name">${escHtml(r.name)}</span>
+                    ${r.init ? `<span class="faculty-row-badge">${escHtml(r.init)}</span>` : ''}
                 </div>
-                <div class="rating-bar-wrapper">
-                    <div class="rating-bar-container">
-                        <div class="rating-bar-fill" data-rating="${faculty.avgRating}"></div>
-                    </div>
+                <div class="bar-track">
+                    <div class="bar-fill" data-w="${r.avg}" style="width:0%"></div>
                 </div>
             </div>
         </div>
     `).join('');
-    
-    courseRatingArea.innerHTML = `
-        <div class="card slide-up course-results-card">
-            <div class="card-header">
-                <h2>Faculty Teaching ${escapeHtml(courseCode)}</h2>
+
+    showResult(courseRatingArea, `
+        <div class="card slide-up">
+            <div class="card-head">
+                <h2 class="leaderboard-title">Faculty teaching ${escHtml(code)}</h2>
             </div>
-            <div class="faculty-list">
-                ${facultyRowsHTML}
+            <div>${rowsHTML}</div>
+            <div class="card-foot">
+                <span class="foot-copy">Sorted by avg score · Tap to view full review</span>
             </div>
-            <div class="card-footer">
-                <span class="footer-text">Click any faculty to view full review</span>
+        </div>
+    `);
+
+    facultyReviewArea.style.display = 'none';
+
+    // Animate bars
+    setTimeout(() => {
+        document.querySelectorAll('.bar-fill').forEach((bar, i) => {
+            setTimeout(() => {
+                const w = bar.getAttribute('data-w');
+                bar.style.setProperty('--w', `${w}%`);
+                bar.classList.add('animated');
+            }, i * 80);
+        });
+    }, 60);
+}
+
+window.searchFaculty = name => handleFacultySearch(name, true);
+
+// ── 9. FACULTY NAME SEARCH ──
+async function handleFacultySearch(input, keepLeaderboard = false) {
+    let faculty = null;
+    const len = input.length;
+    const threshold = len <= 6 ? 0.15 : 0.45;
+
+    if (fuse && allFaculty.length) {
+        const results = fuse.search(input);
+        if (results.length && results[0].score < threshold) {
+            faculty = results[0].item;
+        }
+    }
+
+    if (!faculty) {
+        const { data, error } = await _supabase
+            .from('faculty_reviews')
+            .select('*')
+            .ilike('faculty_name', `%${input}%`)
+            .limit(1)
+            .maybeSingle();
+        if (data && !error) faculty = data;
+    }
+
+    if (!faculty) {
+        if (!keepLeaderboard) {
+            showResult(courseRatingArea, `
+                <div class="card slide-up">
+                    <div class="card-body">
+                        <div class="empty-state">
+                            <span class="empty-icon">🙈</span>
+                            <p class="empty-title">"${escHtml(input)}" isn't listed yet.</p>
+                            <p class="empty-desc">I'm adding faculty in weekly waves, prioritized by demand. Drop the name in the Facebook comments or use the Feedback button — it helps a lot.</p>
+                        </div>
+                    </div>
+                </div>
+            `);
+            facultyReviewArea.style.display = 'none';
+        }
+        return;
+    }
+
+    await displayFaculty(faculty, keepLeaderboard);
+}
+
+// ── 10. VOTE SYSTEM ──
+async function handleVote(id, type) {
+    const key = `vote_${id}`;
+    const current = localStorage.getItem(key);
+    const upEl   = document.querySelector(`#vote-up-${id}`);
+    const downEl = document.querySelector(`#vote-down-${id}`);
+    const cntEl  = document.querySelector(`#vote-count-${id}`);
+
+    let change = 0, next = null;
+
+    if (type === 'up') {
+        if (current === 'up')   { change = -1; upEl.classList.remove('active'); }
+        else if (current === 'down') { change = 2; next = 'up'; downEl.classList.remove('active'); upEl.classList.add('active'); }
+        else                    { change = 1;  next = 'up'; upEl.classList.add('active'); }
+    } else {
+        if (current === 'down') { change = 1;  downEl.classList.remove('active'); }
+        else if (current === 'up')   { change = -2; next = 'down'; upEl.classList.remove('active'); downEl.classList.add('active'); }
+        else                    { change = -1; next = 'down'; downEl.classList.add('active'); }
+    }
+
+    next ? localStorage.setItem(key, next) : localStorage.removeItem(key);
+
+    try {
+        const { data, error } = await _supabase.rpc('increment_vote', { review_id: id, vote_change: change });
+        if (error) throw error;
+        if (cntEl) cntEl.textContent = data ?? 0;
+    } catch {
+        showToast('Vote failed. Try again.', 'error');
+        // Revert
+        if (next === 'up')   upEl.classList.remove('active');
+        if (next === 'down') downEl.classList.remove('active');
+        current ? localStorage.setItem(key, current) : localStorage.removeItem(key);
+    }
+}
+
+function initVotePill(id) {
+    const saved = localStorage.getItem(`vote_${id}`);
+    if (saved === 'up')   document.querySelector(`#vote-up-${id}`)?.classList.add('active');
+    if (saved === 'down') document.querySelector(`#vote-down-${id}`)?.classList.add('active');
+}
+
+window.handleVote = handleVote;
+
+// ── 11. DISPLAY FACULTY ──
+async function displayFaculty(faculty, keepLeaderboard = false) {
+    currentDisplayedFaculty = faculty;
+    currentReviewOffset = 0;
+
+    const parts = (faculty.faculty_reviews || '').split('|');
+    const fullName = parts[0]?.trim() || 'Unknown Faculty';
+    const initial  = parts[1]?.trim() || '';
+    const email    = parts[2]?.trim() || '';
+    const courses  = parts[3]?.trim() || '';
+    const teaching = parts[4]?.trim() || 'N/A';
+    const marking  = parts[5]?.trim() || 'N/A';
+    const behavior = parts[6]?.trim() || 'N/A';
+    const summary  = parts[7]?.trim() || 'No overall review available.';
+    const insights = parts[8]?.trim() || '';
+
+    const courseArr = courses ? courses.split(',').map(c => c.trim()).filter(Boolean) : [];
+    const verdict = getVerdictInfo(teaching, marking, behavior);
+    const { reviews, total, hasMore } = await loadReviews(faculty.id, 5, 0);
+
+    const courseTags = courseArr.map(c =>
+        `<span class="course-tag" onclick="searchCourse('${escHtml(c)}')">${escHtml(c)}</span>`
+    ).join('');
+
+    const verdictHTML = verdict
+        ? `<div class="verdict-badge ${verdict.cls}">${escHtml(verdict.label)}</div>`
+        : '';
+
+    const reviewsHTML = (reviews.length || total)
+        ? buildReviewsHTML(faculty.id, reviews, total, hasMore)
+        : '';
+
+    const html = `
+        <div class="card slide-up">
+            <div class="card-head">
+                ${verdictHTML}
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+                    <h2 class="faculty-name">
+                        ${escHtml(fullName)}
+                        ${initial ? `<span class="faculty-initial">${escHtml(initial)}</span>` : ''}
+                    </h2>
+                </div>
+                ${email ? `<a class="faculty-email" href="mailto:${escHtml(email)}">${escHtml(email)}</a>` : ''}
+                ${courseArr.length ? `<div class="course-tags">${courseTags}</div>` : ''}
+            </div>
+
+            <div class="card-body">
+
+                <!-- Scores -->
+                <div class="scores-row">
+                    ${scoreBlock('Teaching', teaching)}
+                    ${scoreBlock('Marking',  marking)}
+                    ${scoreBlock('Behavior', behavior)}
+                </div>
+
+                <!-- Overall summary -->
+                <div class="verdict-box">
+                    <div class="verdict-box-label">Overall Review</div>
+                    <p class="verdict-text">${escHtml(summary)}</p>
+                </div>
+
+                <!-- Insights -->
+                <div class="card-section-head">What Students Say</div>
+                ${buildInsights(insights)}
+
+                <!-- Vote + actions -->
+                <div class="action-row">
+                    <div class="vote-pill">
+                        <button class="vote-btn v-up" id="vote-up-${faculty.id}" onclick="handleVote(${faculty.id},'up')">
+                            <svg class="vote-arrow" viewBox="0 0 24 24"><path d="M12 4l-8 8h5v8h6v-8h5z"/></svg>
+                            Agree
+                        </button>
+                        <span class="vote-count" id="vote-count-${faculty.id}">${faculty.vote_score || 0}</span>
+                        <div class="vote-divider"></div>
+                        <button class="vote-btn v-down" id="vote-down-${faculty.id}" onclick="handleVote(${faculty.id},'down')">
+                            Disagree
+                            <svg class="vote-arrow" viewBox="0 0 24 24"><path d="M12 20l8-8h-5V4H9v8H4z"/></svg>
+                        </button>
+                    </div>
+                    <div class="action-btns">
+                        <button class="pill-btn" onclick="openReviewModal(${faculty.id},'${escHtml(fullName).replace(/'/g,"\\'")}')">
+                            + Review
+                        </button>
+                        <button class="pill-btn" onclick="handleShareLink(${faculty.id})">
+                            Invite
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Student reviews -->
+                ${reviewsHTML}
+
+            </div>
+
+            <div class="card-foot">
+                <button class="foot-link foot-btn" onclick="toggleAbout()">Disclaimer</button>
+                <button class="foot-link foot-btn" onclick="openSupportCard()">☕ Coffee</button>
             </div>
         </div>
     `;
-    
-    courseRatingArea.style.display = 'block';
-    facultyReviewArea.style.display = 'none';
-    courseRatingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    
+
+    showResult(facultyReviewArea, html);
+    if (!keepLeaderboard) courseRatingArea.style.display = 'none';
+
     setTimeout(() => {
-        document.querySelectorAll('.rating-bar-fill').forEach((bar, index) => {
-            setTimeout(() => {
-                const rating = bar.getAttribute('data-rating');
-                bar.style.setProperty('--target-width', `${rating}%`);
-                bar.classList.add('animate');
-            }, index * 100);
-        });
-    }, 50);
+        initVotePill(faculty.id);
+        facultyReviewArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
 }
 
-window.searchFaculty = function(facultyName) {
-    handleFacultyNameSearch(facultyName, true);
-};
-
-// ============================================
-// 5.2 FACULTY NAME SEARCH HANDLER
-// ============================================
-async function handleFacultyNameSearch(userInput, keepRatingCard = false) {
-    let faculty = null;
-    const inputLength = userInput.length;
-    const scoreThreshold = inputLength <= 6 ? 0.15 : 0.45;
-    
-    if (fuse && allFaculty.length > 0) {
-        const fuseResults = fuse.search(userInput);
-        
-        if (fuseResults.length > 0) {
-            const topMatch = fuseResults[0];
-            const matchScore = topMatch.score;
-            
-            console.log(`Query: "${userInput}" | Length: ${inputLength} | Top match: "${topMatch.item.fullName || topMatch.item.faculty_name}" | Score: ${matchScore.toFixed(3)} | Threshold: ${scoreThreshold}`);
-            
-            if (matchScore < scoreThreshold) {
-                faculty = topMatch.item;
-                console.log(`✓ Match accepted (score ${matchScore.toFixed(3)} < ${scoreThreshold})`);
-            } else {
-                console.log(`✗ Match rejected (score ${matchScore.toFixed(3)} >= ${scoreThreshold})`);
-            }
-        }
-    }
-    
-    if (!faculty) {
-        const { data: exactMatch, error } = await _supabase
-            .from('faculty_reviews')
-            .select('*')
-            .ilike('faculty_name', `%${userInput}%`)
-            .limit(1)
-            .single();
-        
-        if (exactMatch && !error) {
-            faculty = exactMatch;
-            console.log(`Database fallback match found: "${faculty.faculty_name}"`);
-        }
-    }
-
-    if (!faculty) {
-        if (!keepRatingCard) {
-            courseRatingArea.innerHTML = `
-                <div class="card slide-up">
-                    <div class="card-content" style="padding: 2rem; text-align: center;">
-                        <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1.25rem; font-weight: 700;">"${escapeHtml(userInput)}" is not listed yet.</h3>
-                        <p style="color: var(--text-secondary); line-height: 1.7; font-size: 0.95rem;">
-                            I'm prioritizing updates based on your needs. Kindly drop the faculty name in the Facebook comments or use the <strong>Feedback</strong> button to inbox me the name. Help me to complete the archive.
-                        </p>
-                    </div>
-                </div>
-            `;
-            courseRatingArea.style.display = 'block';
-            facultyReviewArea.style.display = 'none';
-            courseRatingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        return;
-    }
-
-    displayFaculty(faculty, keepRatingCard);
+function scoreBlock(label, value) {
+    const cls = getScoreClass(value);
+    return `
+        <div class="score-block">
+            <span class="score-lbl">${label}</span>
+            <span class="score-num ${cls}">${escHtml(value)}</span>
+        </div>
+    `;
 }
 
-// ============================================
-// CONSENSUS PILL VOTE HANDLER
-// ============================================
-async function handleVote(reviewId, voteType) {
-    const storageKey = `vote_status_${reviewId}`;
-    const currentVote = localStorage.getItem(storageKey);
-    
-    const upSection = document.querySelector(`#vote-up-${reviewId}`);
-    const downSection = document.querySelector(`#vote-down-${reviewId}`);
-    const counter = document.querySelector(`#vote-counter-${reviewId}`);
-    
-    let voteChange = 0;
-    let newVoteStatus = null;
-    
-    if (voteType === 'up') {
-        if (currentVote === 'up') {
-            voteChange = -1;
-            newVoteStatus = null;
-            upSection.classList.remove('up-active');
-        } else if (currentVote === 'down') {
-            voteChange = 2;
-            newVoteStatus = 'up';
-            downSection.classList.remove('down-active');
-            upSection.classList.add('up-active');
-        } else {
-            voteChange = 1;
-            newVoteStatus = 'up';
-            upSection.classList.add('up-active');
-        }
-    } else if (voteType === 'down') {
-        if (currentVote === 'down') {
-            voteChange = 1;
-            newVoteStatus = null;
-            downSection.classList.remove('down-active');
-        } else if (currentVote === 'up') {
-            voteChange = -2;
-            newVoteStatus = 'down';
-            upSection.classList.remove('up-active');
-            downSection.classList.add('down-active');
-        } else {
-            voteChange = -1;
-            newVoteStatus = 'down';
-            downSection.classList.add('down-active');
-        }
+function buildInsights(text) {
+    if (!text) return `<div class="insights-list"><div class="insight-item"><span class="insight-text" style="color:var(--t3)">No student insights available yet.</span></div></div>`;
+    const sentences = text
+        .split(/\.(?:\s+|\n+)|(?:\n+)/)
+        .map(s => s.trim())
+        .filter(s => s.length > 2);
+    return `<div class="insights-list">
+        ${sentences.map((s, i) => `
+            <div class="insight-item">
+                <span class="insight-num">${String(i + 1).padStart(2, '0')}</span>
+                <span class="insight-text">${escHtml(s).replace(/(\d+%)/g, '<span class="highlight-pct">$1</span>')}</span>
+            </div>
+        `).join('')}
+    </div>`;
+}
+
+function buildReviewsHTML(facultyId, reviews, total, hasMore) {
+    const cards = reviews.map(buildReviewCard).join('');
+    const loadMore = hasMore ? `
+        <button class="load-more-btn" onclick="loadMoreReviews(${facultyId})">
+            Load more reviews · ${total - 5} remaining
+        </button>
+    ` : '';
+    return `
+        <div class="reviews-section">
+            <div class="reviews-header-row">
+                <span class="reviews-title">Student Reviews</span>
+                <span class="reviews-title">${total}</span>
+            </div>
+            <div id="reviews-container-${facultyId}">${cards}</div>
+            <div id="load-more-wrap-${facultyId}">${loadMore}</div>
+        </div>
+    `;
+}
+
+function buildReviewCard(r) {
+    const avg = (r.teaching_rating + r.marking_rating + r.behavior_rating) / 3;
+    const accent = getReviewAccentColor(avg);
+    return `
+        <div class="review-card" style="--review-accent:${accent}">
+            <div class="review-meta">
+                <span>Anonymous</span>
+                ${r.course_code ? `<span class="review-course-chip">${escHtml(r.course_code)}</span>` : ''}
+                <span>·</span>
+                <span>${timeAgo(r.created_at)}</span>
+            </div>
+            <div class="review-bars">
+                ${reviewBar('Teaching', r.teaching_rating)}
+                ${reviewBar('Marking',  r.marking_rating)}
+                ${reviewBar('Behavior', r.behavior_rating)}
+            </div>
+            <p class="review-text">"${escHtml(r.raw_feedback)}"</p>
+        </div>
+    `;
+}
+
+function reviewBar(label, val) {
+    return `
+        <div class="review-bar-item">
+            <div class="review-bar-head">
+                <span class="rbl">${label}</span>
+                <span class="rbn">${parseFloat(val).toFixed(1)}</span>
+            </div>
+            <div class="prog-bar">
+                <div class="prog-fill" style="width:${(val / 10) * 100}%"></div>
+            </div>
+        </div>
+    `;
+}
+
+async function loadMoreReviews(facultyId) {
+    currentReviewOffset += 5;
+    const { reviews, total, hasMore } = await loadReviews(facultyId, 5, currentReviewOffset);
+    const container = document.getElementById(`reviews-container-${facultyId}`);
+    const wrap = document.getElementById(`load-more-wrap-${facultyId}`);
+    if (container && reviews.length) {
+        container.insertAdjacentHTML('beforeend', reviews.map(buildReviewCard).join(''));
+        const remaining = total - (currentReviewOffset + 5);
+        wrap.innerHTML = hasMore
+            ? `<button class="load-more-btn" onclick="loadMoreReviews(${facultyId})">Load more · ${remaining} remaining</button>`
+            : `<p style="text-align:center;font-size:12px;color:var(--t3);padding-top:12px;">All reviews loaded</p>`;
     }
-    
-    const clickedSection = voteType === 'up' ? upSection : downSection;
-    clickedSection.classList.add('clicked');
-    setTimeout(() => clickedSection.classList.remove('clicked'), 300);
-    
-    if (newVoteStatus) {
-        localStorage.setItem(storageKey, newVoteStatus);
-    } else {
-        localStorage.removeItem(storageKey);
-    }
-    
+}
+
+window.loadMoreReviews = loadMoreReviews;
+
+// ── 12. STUDENT REVIEWS DB ──
+async function loadReviews(facultyId, limit = 5, offset = 0) {
     try {
-        const { data, error } = await _supabase.rpc('increment_vote', {
-            review_id: reviewId,
-            vote_change: voteChange
-        });
-        
-        if (error) throw error;
-        
-        counter.textContent = data || 0;
-    } catch (err) {
-        console.error('Vote error:', err);
-        
-        if (newVoteStatus === 'up') {
-            upSection.classList.remove('up-active');
-        } else if (newVoteStatus === 'down') {
-            downSection.classList.remove('down-active');
-        }
-        
-        if (currentVote) {
-            localStorage.setItem(storageKey, currentVote);
-        } else {
-            localStorage.removeItem(storageKey);
-        }
-        
-        showToast('Vote failed. Please try again.', 'error');
-    }
-}
-
-function initializeVotePill(reviewId, currentScore) {
-    const storageKey = `vote_status_${reviewId}`;
-    const savedVote = localStorage.getItem(storageKey);
-    
-    const upSection = document.querySelector(`#vote-up-${reviewId}`);
-    const downSection = document.querySelector(`#vote-down-${reviewId}`);
-    
-    if (savedVote === 'up') {
-        upSection.classList.add('up-active');
-    } else if (savedVote === 'down') {
-        downSection.classList.add('down-active');
-    }
-}
-
-// Make handleVote globally accessible
-window.handleVote = handleVote;
-
-// ============================================
-// 6. STUDENT REVIEW SYSTEM
-// ============================================
-
-// 6.1 Authentication Check
-function checkUserAuth() {
-    return localStorage.getItem('bracu_user_email');
-}
-
-// 6.2 Email Validation
-function validateBracuEmail(email) {
-    const emailRegex = /^[a-z0-9._%+-]+@g\.bracu\.ac\.bd$/i;
-    return emailRegex.test(email);
-}
-
-// 6.3 Open Review Modal
-function openReviewModal(facultyId, facultyName) {
-    currentFacultyForReview = { id: facultyId, name: facultyName };
-    
-    const userEmail = checkUserAuth();
-    
-    if (!userEmail) {
-        // Show email login step
-        emailLoginStep.style.display = 'block';
-        reviewFormStep.style.display = 'none';
-        reviewEmailInput.value = '';
-    } else {
-        // Show review form directly
-        emailLoginStep.style.display = 'none';
-        reviewFormStep.style.display = 'block';
-        reviewFacultyName.textContent = `Review ${facultyName}`;
-        
-        // Check if user already reviewed this faculty
-        checkExistingReview(facultyId, userEmail);
-    }
-    
-    reviewBackdrop.classList.add('show');
-    document.body.style.overflow = 'hidden';
-}
-
-// 6.4 Close Review Modal
-function closeReviewModal() {
-    reviewBackdrop.classList.remove('show');
-    document.body.style.overflow = '';
-    
-    // Reset form
-    setTimeout(() => {
-        emailLoginStep.style.display = 'block';
-        reviewFormStep.style.display = 'none';
-        reviewEmailInput.value = '';
-        reviewCourseCode.value = '';
-        teachingSlider.value = 5;
-        markingSlider.value = 5;
-        behaviorSlider.value = 5;
-        teachingValue.textContent = '5.0';
-        markingValue.textContent = '5.0';
-        behaviorValue.textContent = '5.0';
-        reviewFeedback.value = '';
-        charCounter.textContent = '0/500';
-        currentFacultyForReview = null;
-    }, 300);
-}
-
-// Event listeners for review modal
-reviewCloseBtn1.addEventListener('click', closeReviewModal);
-reviewCloseBtn2.addEventListener('click', closeReviewModal);
-
-reviewBackdrop.addEventListener('click', (e) => {
-    if (e.target === reviewBackdrop) {
-        closeReviewModal();
-    }
-});
-
-// 6.5 Email Continue Button
-emailContinueBtn.addEventListener('click', async () => {
-    const email = reviewEmailInput.value.trim();
-    
-    if (!email) {
-        showToast('Please enter your email', 'error');
-        return;
-    }
-    
-    if (!validateBracuEmail(email)) {
-        showToast('Please use a valid @g.bracu.ac.bd email', 'error');
-        return;
-    }
-    
-    // Store email in localStorage
-    localStorage.setItem('bracu_user_email', email);
-    
-    // Show review form
-    emailLoginStep.style.display = 'none';
-    reviewFormStep.style.display = 'block';
-    reviewFacultyName.textContent = `Review ${currentFacultyForReview.name}`;
-    
-    // Check if user already reviewed this faculty
-    await checkExistingReview(currentFacultyForReview.id, email);
-});
-
-// 6.6 Check Existing Review
-async function checkExistingReview(facultyId, userEmail) {
-    try {
-        const { data, error } = await _supabase
-            .from('student_reviews')
-            .select('*')
-            .eq('faculty_id', facultyId)
-            .eq('student_email', userEmail)
-            .maybeSingle();  // CRITICAL FIX: Use maybeSingle() instead of single()
-        
-        if (data && !error) {
-            // User has already reviewed, pre-fill form
-            reviewCourseCode.value = data.course_code || '';
-            teachingSlider.value = data.teaching_rating || 5;
-            markingSlider.value = data.marking_rating || 5;
-            behaviorSlider.value = data.behavior_rating || 5;
-            teachingValue.textContent = (data.teaching_rating || 5).toFixed(1);
-            markingValue.textContent = (data.marking_rating || 5).toFixed(1);
-            behaviorValue.textContent = (data.behavior_rating || 5).toFixed(1);
-            reviewFeedback.value = data.raw_feedback || '';
-            charCounter.textContent = `${(data.raw_feedback || '').length}/500`;
-            
-            submitReviewBtn.textContent = 'Update Review';
-        } else {
-            submitReviewBtn.textContent = 'Submit Review';
-        }
-    } catch (err) {
-        console.error('Error checking existing review:', err);
-        submitReviewBtn.textContent = 'Submit Review';
-    }
-}
-
-// 6.7 Slider Value Updates
-teachingSlider.addEventListener('input', (e) => {
-    teachingValue.textContent = parseFloat(e.target.value).toFixed(1);
-});
-
-markingSlider.addEventListener('input', (e) => {
-    markingValue.textContent = parseFloat(e.target.value).toFixed(1);
-});
-
-behaviorSlider.addEventListener('input', (e) => {
-    behaviorValue.textContent = parseFloat(e.target.value).toFixed(1);
-});
-
-// 6.8 Character Counter
-reviewFeedback.addEventListener('input', (e) => {
-    const length = e.target.value.length;
-    charCounter.textContent = `${length}/500`;
-    
-    // Visual feedback: turn green when minimum reached
-    if (length < 3) {
-        charCounter.style.color = 'var(--error-color)';
-    } else if (length >= 3 && length <= 500) {
-        charCounter.style.color = '#22c55e';  // Green
-    } else {
-        charCounter.style.color = 'var(--error-color)';
-    }
-});
-
-// 6.9 Submit Review - CRITICAL FIXES APPLIED
-submitReviewBtn.addEventListener('click', async () => {
-    const userEmail = checkUserAuth();
-    
-    if (!userEmail || !currentFacultyForReview) {
-        showToast('Session expired. Please try again.', 'error');
-        closeReviewModal();
-        return;
-    }
-    
-    const courseCode = reviewCourseCode.value.trim().toUpperCase() || null;
-    const teaching = parseFloat(teachingSlider.value);
-    const marking = parseFloat(markingSlider.value);
-    const behavior = parseFloat(behaviorSlider.value);
-    const feedback = reviewFeedback.value.trim();
-    
-    // Validation
-    if (feedback.length < 3) {
-        showToast(`Need ${3 - feedback.length} more characters (${feedback.length}/3 minimum)`, 'error');
-        return;
-    }
-    
-    if (feedback.length > 500) {
-        showToast('Feedback cannot exceed 500 characters', 'error');
-        return;
-    }
-    
-    submitReviewBtn.disabled = true;
-    submitReviewBtn.textContent = 'Submitting...';
-    
-    try {
-        console.log('Attempting to submit review...', {
-            faculty_id: currentFacultyForReview.id,
-            student_email: userEmail,
-            course_code: courseCode,
-            teaching_rating: teaching,
-            marking_rating: marking,
-            behavior_rating: behavior,
-            feedback_length: feedback.length
-        });
-        
-        // Check if updating existing review
-        const { data: existing, error: checkError } = await _supabase
-            .from('student_reviews')
-            .select('id')
-            .eq('faculty_id', currentFacultyForReview.id)
-            .eq('student_email', userEmail)
-            .maybeSingle();  // CRITICAL FIX: Use maybeSingle()
-        
-        if (checkError) {
-            console.error('Error checking existing review:', checkError);
-            throw checkError;
-        }
-        
-        if (existing) {
-            console.log('Updating existing review:', existing.id);
-            // Update existing review
-            const { data: updateData, error: updateError } = await _supabase
-                .from('student_reviews')
-                .update({
-                    course_code: courseCode,
-                    teaching_rating: teaching,
-                    marking_rating: marking,
-                    behavior_rating: behavior,
-                    raw_feedback: feedback,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', existing.id)
-                .select();  // CRITICAL FIX: Add .select() to get response
-            
-            if (updateError) {
-                console.error('Update error:', updateError);
-                throw updateError;
-            }
-            
-            console.log('Update successful:', updateData);
-            showToast('Review updated successfully!', 'success');
-        } else {
-            console.log('Inserting new review...');
-            // Insert new review
-            const { data: insertData, error: insertError } = await _supabase
-                .from('student_reviews')
-                .insert({
-                    faculty_id: currentFacultyForReview.id,
-                    student_email: userEmail,
-                    course_code: courseCode,
-                    teaching_rating: teaching,
-                    marking_rating: marking,
-                    behavior_rating: behavior,
-                    raw_feedback: feedback
-                })
-                .select();  // CRITICAL FIX: Add .select() to get response
-            
-            if (insertError) {
-                console.error('Insert error:', insertError);
-                throw insertError;
-            }
-            
-            console.log('Insert successful:', insertData);
-            showToast('Review submitted successfully!', 'success');
-        }
-        
-        closeReviewModal();
-        
-        // Reload reviews for this faculty
-        const currentFaculty = allFaculty.find(f => f.id === currentFacultyForReview.id);
-        if (currentFaculty) {
-            setTimeout(() => {
-                displayFaculty(currentFaculty, true);
-            }, 500);
-        }
-        
-    } catch (err) {
-        console.error('Error submitting review:', err);
-        
-        if (err.message && err.message.includes('Daily review limit reached')) {
-            showToast('Daily review limit reached (10 per day)', 'error');
-        } else if (err.message) {
-            showToast(`Error: ${err.message}`, 'error');
-        } else {
-            showToast('Failed to submit review. Please try again.', 'error');
-        }
-    } finally {
-        submitReviewBtn.disabled = false;
-        submitReviewBtn.textContent = 'Submit Review';
-    }
-});
-
-// 6.10 Load Student Reviews - WITH PAGINATION
-async function loadStudentReviews(facultyId, limit = 5, offset = 0) {
-    try {
-        // Get total count
         const { count } = await _supabase
             .from('student_reviews')
             .select('*', { count: 'exact', head: true })
             .eq('faculty_id', facultyId);
-        
-        // Get paginated reviews
+
         const { data, error } = await _supabase
             .from('student_reviews')
             .select('*')
             .eq('faculty_id', facultyId)
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1);
-        
+
         if (error) throw error;
-        
-        return {
-            reviews: data || [],
-            total: count || 0,
-            hasMore: (offset + limit) < (count || 0)
-        };
-    } catch (err) {
-        console.error('Error loading reviews:', err);
+        return { reviews: data || [], total: count || 0, hasMore: (offset + limit) < (count || 0) };
+    } catch {
         return { reviews: [], total: 0, hasMore: false };
     }
 }
 
-// 6.12 Format Time Ago
-function formatTimeAgo(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
-    
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 2592000) return `${Math.floor(seconds / 86400)}d ago`;
-    return `${Math.floor(seconds / 2592000)}mo ago`;
-}
-
-// 6.13 Handle Share Link - CRITICAL FIX
-async function handleShareLink(facultyId, facultyName) {
-    // FIXED: Generate correct review-specific URL
-    const baseUrl = window.location.origin + window.location.pathname;
-    const url = `${baseUrl}?reviewFaculty=${facultyId}`;
-    
-    console.log('Share link generated:', url);
-    
-    try {
-        await navigator.clipboard.writeText(url);
-        showToast('✓ Review form link copied! Now share link with classmates or seniors.', 'success');
-    } catch (err) {
-        console.error('Copy failed:', err);
-        showToast('Failed to copy link', 'error');
+// ── 13. REVIEW MODAL ──
+function openReviewModal(facultyId, facultyName) {
+    currentFacultyForReview = { id: facultyId, name: facultyName };
+    const email = localStorage.getItem('bracu_user_email');
+    if (email) {
+        emailLoginStep.style.display = 'none';
+        reviewFormStep.style.display = 'block';
+        reviewFacultyName.textContent = facultyName;
+        checkExistingReview(facultyId, email);
+    } else {
+        emailLoginStep.style.display = 'block';
+        reviewFormStep.style.display = 'none';
+        reviewEmailInput.value = '';
     }
+    openSheet(reviewBackdrop);
 }
 
-// 6.14 Check URL Parameters on Load
-window.addEventListener('DOMContentLoaded', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const reviewFacultyId = urlParams.get('reviewFaculty');
-    
-    if (reviewFacultyId) {
-        console.log('Share link detected for faculty ID:', reviewFacultyId);
-        
-        // Wait for faculty data to load, then open modal
-        const checkFacultyLoaded = setInterval(() => {
-            if (allFaculty.length > 0) {
-                clearInterval(checkFacultyLoaded);
-                
-                const faculty = allFaculty.find(f => f.id === parseInt(reviewFacultyId));
-                
-                if (faculty) {
-                    const parts = faculty.faculty_reviews?.split('|') || [];
-                    const fullName = parts[0]?.trim() || "Faculty";
-                    
-                    // Open review modal after a short delay
-                    setTimeout(() => {
-                        openReviewModal(faculty.id, fullName);
-                    }, 500);
-                } else {
-                    console.error('Faculty not found for ID:', reviewFacultyId);
-                }
-            }
-        }, 100);
-        
-        // Timeout after 5 seconds
-        setTimeout(() => {
-            clearInterval(checkFacultyLoaded);
-        }, 5000);
+function closeReviewModal() {
+    closeSheet(reviewBackdrop);
+    setTimeout(() => {
+        emailLoginStep.style.display = 'block';
+        reviewFormStep.style.display = 'none';
+        reviewEmailInput.value = '';
+        reviewCourseCode.value = '';
+        [teachingSlider, markingSlider, behaviorSlider].forEach(s => s.value = 5);
+        [teachingValue, markingValue, behaviorValue].forEach(v => v.textContent = '5.0');
+        reviewFeedback.value = '';
+        charCounter.textContent = '0 / 500';
+        charCounter.className = 'char-count';
+        submitReviewBtn.textContent = 'Submit Review';
+        currentFacultyForReview = null;
+    }, 350);
+}
+
+async function checkExistingReview(facultyId, email) {
+    try {
+        const { data } = await _supabase
+            .from('student_reviews')
+            .select('*')
+            .eq('faculty_id', facultyId)
+            .eq('student_email', email)
+            .maybeSingle();
+
+        if (data) {
+            reviewCourseCode.value = data.course_code || '';
+            teachingSlider.value = data.teaching_rating || 5;
+            markingSlider.value  = data.marking_rating  || 5;
+            behaviorSlider.value = data.behavior_rating || 5;
+            teachingValue.textContent = (data.teaching_rating || 5).toFixed(1);
+            markingValue.textContent  = (data.marking_rating  || 5).toFixed(1);
+            behaviorValue.textContent = (data.behavior_rating || 5).toFixed(1);
+            reviewFeedback.value = data.raw_feedback || '';
+            updateCharCount(reviewFeedback.value.length);
+            submitReviewBtn.textContent = 'Update Review';
+        }
+    } catch { /* ignore */ }
+}
+
+// Email step
+emailContinueBtn.addEventListener('click', async () => {
+    const email = reviewEmailInput.value.trim();
+    if (!email) { showToast('Please enter your email', 'error'); return; }
+    if (!/^[a-z0-9._%+-]+@g\.bracu\.ac\.bd$/i.test(email)) {
+        showToast('Must be a @g.bracu.ac.bd email', 'error'); return;
+    }
+    localStorage.setItem('bracu_user_email', email);
+    emailLoginStep.style.display = 'none';
+    reviewFormStep.style.display = 'block';
+    reviewFacultyName.textContent = currentFacultyForReview?.name || 'Faculty';
+    await checkExistingReview(currentFacultyForReview.id, email);
+});
+
+// Sliders
+teachingSlider.addEventListener('input', e => { teachingValue.textContent = parseFloat(e.target.value).toFixed(1); });
+markingSlider.addEventListener('input',  e => { markingValue.textContent  = parseFloat(e.target.value).toFixed(1); });
+behaviorSlider.addEventListener('input', e => { behaviorValue.textContent = parseFloat(e.target.value).toFixed(1); });
+
+// Char counter
+reviewFeedback.addEventListener('input', e => updateCharCount(e.target.value.length));
+
+function updateCharCount(len) {
+    charCounter.textContent = `${len} / 500`;
+    charCounter.className = 'char-count' + (len < 3 ? ' err' : len >= 3 ? ' ok' : '');
+}
+
+// Submit
+submitReviewBtn.addEventListener('click', async () => {
+    const email = localStorage.getItem('bracu_user_email');
+    if (!email || !currentFacultyForReview) { showToast('Session expired', 'error'); closeReviewModal(); return; }
+
+    const code     = reviewCourseCode.value.trim().toUpperCase() || null;
+    const teaching = parseFloat(teachingSlider.value);
+    const marking  = parseFloat(markingSlider.value);
+    const behavior = parseFloat(behaviorSlider.value);
+    const feedback = reviewFeedback.value.trim();
+
+    if (feedback.length < 3)   { showToast(`${3 - feedback.length} more characters needed`, 'error'); return; }
+    if (feedback.length > 500) { showToast('Too long (max 500 chars)', 'error'); return; }
+
+    submitReviewBtn.disabled = true;
+    submitReviewBtn.textContent = 'Submitting…';
+
+    try {
+        const { data: existing } = await _supabase
+            .from('student_reviews')
+            .select('id')
+            .eq('faculty_id', currentFacultyForReview.id)
+            .eq('student_email', email)
+            .maybeSingle();
+
+        if (existing) {
+            const { error } = await _supabase.from('student_reviews').update({
+                course_code: code, teaching_rating: teaching,
+                marking_rating: marking, behavior_rating: behavior,
+                raw_feedback: feedback, updated_at: new Date().toISOString()
+            }).eq('id', existing.id).select();
+            if (error) throw error;
+            showToast('Review updated!', 'success');
+        } else {
+            const { error } = await _supabase.from('student_reviews').insert({
+                faculty_id: currentFacultyForReview.id, student_email: email,
+                course_code: code, teaching_rating: teaching,
+                marking_rating: marking, behavior_rating: behavior,
+                raw_feedback: feedback
+            }).select();
+            if (error) throw error;
+            showToast('Review submitted!', 'success');
+        }
+
+        closeReviewModal();
+        const f = allFaculty.find(x => x.id === currentFacultyForReview?.id);
+        if (f) setTimeout(() => displayFaculty(f, true), 600);
+
+    } catch (err) {
+        showToast(err.message || 'Failed. Try again.', 'error');
+    } finally {
+        submitReviewBtn.disabled = false;
+        submitReviewBtn.textContent = 'Submit Review';
     }
 });
 
-// Make openReviewModal globally accessible
+// Modal listeners
+reviewCloseBtn1.addEventListener('click', closeReviewModal);
+reviewCloseBtn2.addEventListener('click', closeReviewModal);
+reviewBackdrop.addEventListener('click', e => { if (e.target === reviewBackdrop) closeReviewModal(); });
+
 window.openReviewModal = openReviewModal;
+
+// ── 14. SHARE LINK ──
+async function handleShareLink(facultyId) {
+    const url = `${location.origin}${location.pathname}?reviewFaculty=${facultyId}`;
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('Link copied — share with classmates!', 'success');
+    } catch {
+        showToast('Copy failed', 'error');
+    }
+}
 window.handleShareLink = handleShareLink;
 
-// ============================================
-// 7. DISPLAY FACULTY RESULTS WITH REVIEWS
-// ============================================
+// ── 15. URL PARAMS ──
+function checkUrlParams() {
+    const id = new URLSearchParams(location.search).get('reviewFaculty');
+    if (!id) return;
+    const checkInterval = setInterval(() => {
+        if (!allFaculty.length) return;
+        clearInterval(checkInterval);
+        const f = allFaculty.find(x => x.id === parseInt(id));
+        if (f) {
+            const name = f.faculty_reviews?.split('|')[0]?.trim() || 'Faculty';
+            setTimeout(() => openReviewModal(f.id, name), 600);
+        }
+    }, 100);
+    setTimeout(() => clearInterval(checkInterval), 6000);
+}
 
-// Global variable to track review pagination
-let currentReviewOffset = 0;
-let currentDisplayedFaculty = null;
+// ── 16. COFFEE SUPPORT ──
+function openSupportCard() {
+    openSheet(supportBackdrop);
+}
+function closeSupportCard() {
+    closeSheet(supportBackdrop);
+}
+supportCloseBtn.addEventListener('click', closeSupportCard);
+supportBackdrop.addEventListener('click', e => { if (e.target === supportBackdrop) closeSupportCard(); });
 
-async function displayFaculty(faculty, keepRatingCard = false) {
-    currentDisplayedFaculty = faculty;
-    currentReviewOffset = 0; // Reset pagination
-    
-    let fullName, initial, email, courses, teaching, marking, behavior, overallSummary, statisticalInsights;
-    
-    if (faculty.faculty_reviews) {
-        const parts = faculty.faculty_reviews.split('|');
-        fullName = parts[0]?.trim() || "Unknown Faculty";
-        initial = parts[1]?.trim() || "";
-        email = parts[2]?.trim() || "";
-        courses = parts[3]?.trim() || "";
-        teaching = parts[4]?.trim() || "N/A";
-        marking = parts[5]?.trim() || "N/A";
-        behavior = parts[6]?.trim() || "N/A";
-        overallSummary = parts[7]?.trim() || "No overall verdict available.";
-        statisticalInsights = parts[8]?.trim() || "No student insights available.";
-    } else {
-        fullName = "Unknown Faculty";
-        initial = "";
-        email = "";
-        courses = "";
-        teaching = "N/A";
-        marking = "N/A";
-        behavior = "N/A";
-        overallSummary = "No overall verdict available.";
-        statisticalInsights = "No student insights available.";
+copyNumberBtn.addEventListener('click', async () => {
+    try {
+        await navigator.clipboard.writeText('01908341690');
+        copyNumberBtn.textContent = '✓ Copied!';
+        setTimeout(() => copyNumberBtn.textContent = 'Copy Number', 2200);
+    } catch {
+        showToast('Copy failed', 'error');
     }
-    
-    const courseArray = courses ? courses.split(',').map(c => c.trim()).filter(c => c) : [];
-    const courseTags = courseArray.map(course => 
-        `<span style="display: inline-block; background: var(--input-bg); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.75rem; margin-right: 0.5rem; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">${escapeHtml(course)}</span>`
-    ).join('');
-    
-    // Load initial reviews (first 5)
-    const { reviews: studentReviews, total, hasMore } = await loadStudentReviews(faculty.id, 5, 0);
-    
-    // Generate student reviews HTML
-    let studentReviewsHTML = '';
-    if (studentReviews.length > 0 || total > 0) {
-        const reviewCardsHTML = generateReviewCards(studentReviews);
-        const loadMoreButton = hasMore ? `
-            <div style="text-align: center; margin-top: 1rem;">
-                <button class="load-more-reviews-btn" onclick="loadMoreReviews(${faculty.id})">
-                    Load More Reviews (${total - 5} remaining)
-                </button>
-            </div>
-        ` : '';
-        
-        studentReviewsHTML = `
-            <div class="student-reviews-section">
-                <span class="reviews-header">Student Reviews (${total})</span>
-                <div id="reviews-container-${faculty.id}">
-                    ${reviewCardsHTML}
+});
+
+window.openSupportCard = openSupportCard;
+window.closeSupportCard = closeSupportCard;
+
+// ── 17. ABOUT/DISCLAIMER ──
+function toggleAbout() {
+    const area = document.getElementById('aboutArea');
+    if (area.style.display === 'none' || !area.style.display) {
+        area.innerHTML = `
+            <div class="card slide-up">
+                <div class="card-head">
+                    <h2 style="font-size:18px;font-weight:800;letter-spacing:-0.02em;color:var(--t1)">Disclaimer & Data Notice</h2>
                 </div>
-                <div id="load-more-container-${faculty.id}">
-                    ${loadMoreButton}
+                <div class="card-body">
+                    <div class="disclaimer-section">
+                        <div class="disclaimer-heading">What is this?</div>
+                        <p class="disclaimer-text">An independent tool to help BRACU students find patterns in thousands of faculty reviews from Facebook groups — saving you hours of scrolling.</p>
+                    </div>
+                    <div class="disclaimer-section">
+                        <div class="disclaimer-heading">Methodology</div>
+                        <div class="insights-list">
+                            <div class="insight-item"><span class="insight-num">01</span><span class="insight-text">12–20+ review posts tracked per faculty member</span></div>
+                            <div class="insight-item"><span class="insight-num">02</span><span class="insight-text">Hundreds of student comments analyzed per faculty</span></div>
+                            <div class="insight-item"><span class="insight-num">03</span><span class="insight-text">AI used to identify consistent patterns, not generate opinions</span></div>
+                        </div>
+                    </div>
+                    <div class="disclaimer-section">
+                        <div class="disclaimer-heading">Important</div>
+                        <div class="insights-list">
+                            <div class="insight-item"><span class="insight-num">→</span><span class="insight-text">Not affiliated with BRACU or any department</span></div>
+                            <div class="insight-item"><span class="insight-num">→</span><span class="insight-text">These are peer experiences, not official evaluations</span></div>
+                            <div class="insight-item"><span class="insight-num">→</span><span class="insight-text">Contact via Feedback to report inaccuracies</span></div>
+                        </div>
+                    </div>
+                    <div class="disclaimer-section">
+                        <div class="disclaimer-heading">Status</div>
+                        <p class="disclaimer-text">Currently covering CSE Department. Adding more faculty and departments in weekly waves — each entry requires deep research and manual verification.</p>
+                    </div>
+                </div>
+                <div class="card-foot">
+                    <button class="foot-link foot-btn" onclick="toggleAbout()">Close</button>
+                    <button class="foot-link foot-btn" onclick="openSupportCard()">☕ Coffee</button>
                 </div>
             </div>
         `;
-    }
-
-    facultyReviewArea.innerHTML = `
-        <div class="card slide-up" style="z-index: 1 !important;">
-            <div class="card-header">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <h2 class="result-card-headline">
-                        ${escapeHtml(fullName)}
-                    </h2>
-                    ${initial ? `<span class="initial-badge">${escapeHtml(initial)}</span>` : ''}
-                </div>
-                ${email ? `<a href="mailto:${escapeHtml(email)}" style="color: var(--text-primary); font-size: 0.875rem; text-decoration: none; display: block; margin-bottom: 1rem; opacity: 0.8; transition: opacity 0.2s; word-break: break-word;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">${escapeHtml(email)}</a>` : ''}
-                ${courseArray.length > 0 ? `<div style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">${courseTags}</div>` : ''}
-            </div>
-            <div class="card-body">
-                <div class="ratings-grid">
-                    <div style="background: var(--input-bg); padding: 1rem; text-align: center; border-radius: 8px;">
-                        <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Teaching</span>
-                        <span style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">${escapeHtml(teaching)}</span>
-                    </div>
-                    <div style="background: var(--input-bg); padding: 1rem; text-align: center; border-radius: 8px;">
-                        <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Marking</span>
-                        <span style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">${escapeHtml(marking)}</span>
-                    </div>
-                    <div style="background: var(--input-bg); padding: 1rem; text-align: center; border-radius: 8px;">
-                        <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Behavior</span>
-                        <span style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">${escapeHtml(behavior)}</span>
-                    </div>
-                </div>
-                
-                <div class="verdict-box">
-                    <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; font-weight: 600; letter-spacing: 0.5px;">Overall Review</span>
-                    <p style="margin: 0; line-height: 1.6; color: var(--text-primary); font-size: 0.95rem; font-weight: 400;">${escapeHtml(overallSummary)}</p>
-                </div>
-
-                <div>
-                    <span style="display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1rem; font-weight: 600; letter-spacing: 0.5px;">What Students Say</span>
-                    ${parseInsights(statisticalInsights)}
-                    
-                    <div class="vote-and-review-row">
-                        <div class="button-group-centered">
-                            <div class="consensus-pill-wrapper">
-                                <div class="vote-pill">
-                                    <div class="vote-section" id="vote-up-${faculty.id}" onclick="handleVote(${faculty.id}, 'up')">
-                                        <span class="vote-text">Agree</span>
-                                        <svg class="arrow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M12 4l-8 8h5v8h6v-8h5z"/>
-                                        </svg>
-                                    </div>
-                                    
-                                    <span class="vote-counter" id="vote-counter-${faculty.id}">${faculty.vote_score || 0}</span>
-                                    
-                                    <div class="vote-divider"></div>
-                                    
-                                    <div class="vote-section" id="vote-down-${faculty.id}" onclick="handleVote(${faculty.id}, 'down')">
-                                        <svg class="arrow-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M12 20l8-8h-5V4H9v8H4z"/>
-                                        </svg>
-                                        <span class="vote-text">Disagree</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="action-buttons-group">
-                                <div class="add-review-button" onclick="openReviewModal(${faculty.id}, '${escapeHtml(fullName).replace(/'/g, "\\'")}')">
-                                    <span class="comment-icon">+</span>
-                                    <span>Add Review</span>
-                                </div>
-                                <button class="share-link-btn-new" onclick="handleShareLink(${faculty.id}, '${escapeHtml(fullName).replace(/'/g, "\\'")}')">
-                                    Invite Review
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                ${studentReviewsHTML}
-            </div>
-            
-            <div class="card-footer">
-                <div>
-                    <span class="footer-link" onclick="toggleAboutCard()">Disclaimer & Data Notice</span>
-                </div>
-                <div class="coffee-trigger" onclick="openSupportCard()">
-                    <span class="coffee-icon">☕</span>
-                </div>
-            </div>
-        </div>
-    `;
-
-    facultyReviewArea.style.display = 'block';
-    
-    if (!keepRatingCard) {
-        courseRatingArea.style.display = 'none';
-        facultyReviewArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        area.style.display = 'block';
+        area.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
-        setTimeout(() => {
-            facultyReviewArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-    }
-    
-    setTimeout(() => {
-        initializeVotePill(faculty.id, faculty.vote_score || 0);
-    }, 100);
-}
-
-// Helper function to generate review cards HTML
-function generateReviewCards(reviews) {
-    return reviews.map(review => `
-        <div class="student-review-card">
-            <div class="review-header">
-                <span>Anonymous</span>
-                ${review.course_code ? `<span class="review-course-badge">${escapeHtml(review.course_code)}</span>` : ''}
-                <span>•</span>
-                <span>${formatTimeAgo(review.created_at)}</span>
-            </div>
-            <div class="review-ratings-row">
-                <div class="rating-line-modern">
-                    <div class="rating-line-header">
-                        <span class="rating-label-modern">Teaching</span>
-                        <span class="rating-number-modern">${review.teaching_rating.toFixed(1)}</span>
-                    </div>
-                    <div class="rating-progress-bar">
-                        <div class="rating-progress-fill" style="width: ${(review.teaching_rating / 10) * 100}%"></div>
-                    </div>
-                </div>
-                <div class="rating-line-modern">
-                    <div class="rating-line-header">
-                        <span class="rating-label-modern">Marking</span>
-                        <span class="rating-number-modern">${review.marking_rating.toFixed(1)}</span>
-                    </div>
-                    <div class="rating-progress-bar">
-                        <div class="rating-progress-fill" style="width: ${(review.marking_rating / 10) * 100}%"></div>
-                    </div>
-                </div>
-                <div class="rating-line-modern">
-                    <div class="rating-line-header">
-                        <span class="rating-label-modern">Behavior</span>
-                        <span class="rating-number-modern">${review.behavior_rating.toFixed(1)}</span>
-                    </div>
-                    <div class="rating-progress-bar">
-                        <div class="rating-progress-fill" style="width: ${(review.behavior_rating / 10) * 100}%"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="review-feedback">"${escapeHtml(review.raw_feedback)}"</div>
-        </div>
-    `).join('');
-}
-
-// Load More Reviews Function
-async function loadMoreReviews(facultyId) {
-    currentReviewOffset += 5;
-    
-    const { reviews, total, hasMore } = await loadStudentReviews(facultyId, 5, currentReviewOffset);
-    
-    if (reviews.length > 0) {
-        // Append new reviews to container
-        const container = document.getElementById(`reviews-container-${facultyId}`);
-        const newReviewsHTML = generateReviewCards(reviews);
-        container.insertAdjacentHTML('beforeend', newReviewsHTML);
-        
-        // Update or remove Load More button
-        const loadMoreContainer = document.getElementById(`load-more-container-${facultyId}`);
-        if (hasMore) {
-            const remaining = total - (currentReviewOffset + 5);
-            loadMoreContainer.innerHTML = `
-                <div style="text-align: center; margin-top: 1rem;">
-                    <button class="load-more-reviews-btn" onclick="loadMoreReviews(${facultyId})">
-                        Load More Reviews (${remaining} remaining)
-                    </button>
-                </div>
-            `;
-        } else {
-            loadMoreContainer.innerHTML = `
-                <div style="text-align: center; margin-top: 1rem; color: var(--text-muted); font-size: 0.875rem;">
-                    All reviews loaded
-                </div>
-            `;
-        }
+        area.style.display = 'none';
     }
 }
+window.toggleAbout = toggleAbout;
 
-// Make loadMoreReviews globally accessible
-window.loadMoreReviews = loadMoreReviews;
+// ── 18. COURSE TAG CLICK ──
+window.searchCourse = code => {
+    searchInput.value = code;
+    handleCourseSearch(code);
+};
 
-// ============================================
-// 8. UTILITY FUNCTIONS
-// ============================================
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+// ── 19. ESC KEY ──
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    closeSheet(supportBackdrop);
+    closeSheet(reviewBackdrop);
+    closeReviewModal();
+});
+
+// ── 20. UTILS ──
+function showResult(el, html) {
+    el.innerHTML = html;
+    el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function parseInsights(text) {
-    if (!text) return '<div class="insight-point">No student insights available.</div>';
-    
-    const sentences = text
-        .split(/\.(?:\s+|\n+)|(?:\n+)/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
-    
-    if (sentences.length === 1) {
-        const formatted = formatInsightText(sentences[0]);
-        return `<div class="insight-point">${formatted}</div>`;
-    }
-    
-    return sentences
-        .map(sentence => {
-            const formatted = formatInsightText(sentence);
-            return `<div class="insight-point">${formatted}</div>`;
-        })
-        .join('');
+function openSheet(backdrop) {
+    backdrop.classList.add('show');
+    document.body.style.overflow = 'hidden';
 }
 
-function formatInsightText(text) {
-    const escaped = escapeHtml(text);
-    return escaped.replace(/(\d+%)/g, '<span class="percentage">$1</span>');
+function closeSheet(backdrop) {
+    backdrop.classList.remove('show');
+    document.body.style.overflow = '';
 }
 
-// ============================================
-// 9. ABOUT CARD FUNCTIONS
-// ============================================
-function toggleAboutCard() {
-    const aboutArea = document.getElementById('aboutArea');
-    
-    if (aboutArea.style.display === 'none' || !aboutArea.style.display) {
-        renderAboutCard();
-        aboutArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else {
-        aboutArea.style.display = 'none';
-    }
+let toastTimer;
+function showToast(msg, type = 'success') {
+    toastEl.textContent = msg;
+    toastEl.className = `toast ${type} show`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3800);
 }
 
-function renderAboutCard() {
-    const aboutArea = document.getElementById('aboutArea');
-    
-    aboutArea.innerHTML = `
-        <div class="card slide-up">
-            <div class="card-header">
-                <h2 style="margin: 0; font-size: 1.5rem; color: var(--text-primary); font-weight: 700; letter-spacing: -0.02em;">Disclaimer & Data Notice</h2>
-            </div>
-            <div class="card-body">
-                <div style="margin-bottom: 2rem;">
-                    <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; letter-spacing: 0.3px;">What is this?</h3>
-                    <p style="margin: 0; color: var(--text-primary); font-size: 0.95rem; line-height: 1.7; font-weight: 400;">
-                        I built this independent tool to help students instantly find patterns in thousands of faculty reviews shared within our BRACU community. It's designed to save you hours of scrolling through group archives.
-                    </p>
-                </div>
-                
-                <div style="margin-bottom: 2rem;">
-                    <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem; letter-spacing: 0.3px;">The Methodology</h3>
-                    <div class="insight-point">I tracked down 12 to 20+ dedicated review posts for every faculty member.</div>
-                    <div class="insight-point">I analyzed hundreds of student comments per faculty member.</div>
-                    <div class="insight-point">I used AI to find consistent patterns among students review.</div>
-                </div>
-                
-                <div style="margin-bottom: 2rem;">
-                    <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem; letter-spacing: 0.3px;">Important Context</h3>
-                    <div class="insight-point">This is not an official university tool and is not affiliated with any department.</div>
-                    <div class="insight-point">These are peer experiences, not factual evaluations. Please use your own judgment.</div>
-                    <div class="insight-point">I built this to help, not to judge. If any data is inaccurate or needs removal, please reach out via the Feedback button.</div>
-                </div>
-                
-                <div style="margin-bottom: 0;">
-                    <h3 style="font-size: 0.875rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem; letter-spacing: 0.3px;">Current Status</h3>
-                    <p style="margin: 0; color: var(--text-primary); font-size: 0.95rem; line-height: 1.7; font-weight: 400;">
-                        Currently, I am doing it for CSE Department. Because each entry requires deep research and manual verification, I am adding more faculties and departments in weekly waves.
-                    </p>
-                </div>
-            </div>
-            
-            <div class="card-footer">
-                <div><span class="footer-link" onclick="toggleAboutCard()">Close</span></div>
-                <div class="coffee-trigger" onclick="openSupportCard()"><span class="coffee-icon">☕</span></div>
-            </div>
-        </div>
-    `;
-    
-    aboutArea.style.display = 'block';
+function timeAgo(ts) {
+    const s = Math.floor((Date.now() - new Date(ts)) / 1000);
+    if (s < 60)       return 'just now';
+    if (s < 3600)     return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400)    return `${Math.floor(s / 3600)}h ago`;
+    if (s < 2592000)  return `${Math.floor(s / 86400)}d ago`;
+    return `${Math.floor(s / 2592000)}mo ago`;
 }
 
-function closeAboutCard() {
-    const aboutArea = document.getElementById('aboutArea');
-    aboutArea.style.display = 'none';
-}
-
-// Make toggleAboutCard globally accessible
-window.toggleAboutCard = toggleAboutCard;
-
-// ============================================
-// 10. TOAST NOTIFICATIONS
-// ============================================
-function showToast(message, type = 'success') {
-    toast.textContent = message;
-    toast.className = `toast ${type}`;
-    toast.classList.add('show');
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 4000);
+function escHtml(str) {
+    if (str == null) return '';
+    const d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
 }

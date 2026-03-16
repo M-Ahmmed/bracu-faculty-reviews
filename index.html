@@ -3,196 +3,188 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Faculty Reviews</title>
+    <meta name="description" content="Find honest BRACU faculty reviews. 1,500+ student reviews analyzed and summarized.">
+    <meta property="og:title" content="BRACU Faculty Reviews">
+    <meta property="og:description" content="Find your faculty before registration. Real data from real students.">
+    <meta name="theme-color" content="#000000">
+    <title>BRACU Faculty Reviews</title>
     <link rel="icon" href="favicon.ico" type="image/x-icon">
-    <link rel="preload" as="image" href="WhatsApp Image 2026-01-23 at 12.54.47 PM (1).webp">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 </head>
 <body>
-    <div class="background-mesh"></div>
-    
-    <div class="container">
-        <div class="card" id="mainLandingCard">
-            <div class="card-content">
+
+    <div class="bg-photo"></div>
+    <div class="bg-overlay"></div>
+
+    <main class="container">
+
+        <!-- ── SEARCH CARD ── -->
+        <div class="card card-search" id="mainLandingCard">
+            <div class="search-body">
+
+                
+
                 <h1 class="headline" id="typewriterText"></h1>
-                
-                <p class="description">
-                    No distraction. No chaos. Just the actual data you need.
+
+                <p class="sub">
+                    No chaos. No Facebook scrolling.<br>Just the actual data you need.
                 </p>
-                
-                <div class="source-line">
-                    <span>Source: 1,500+ raw Facebook reviews.</span>
-                    <span class="separator">|</span>
-                    <span>Last Update: January 2026.</span>
-                    <span class="separator">|</span>
-                    <span>Methodology: AI-summarized.</span>
+
+                <div class="meta-row">
+                    <span>1,500+ reviews</span>
+                    <span class="sep">·</span>
+                    <span>Updated Jan 2026</span>
+                    <span class="sep">·</span>
+                    <span>AI-distilled</span>
                 </div>
-                
+
                 <form class="search-form" id="searchForm">
-                    <div class="search-input-wrapper">
-                        <input 
-                            type="text" 
-                            class="search-input" 
-                            placeholder="faculty or course code..."
-                            id="searchInput"
-                            autocomplete="off"
-                        />
-                        <button type="submit" class="search-button" id="searchButton">
-                            <span class="button-text">Search</span>
-                            <span class="spinner" id="spinner"></span>
-                        </button>
+                    <div class="search-pill-wrap" id="searchWrap">
+                        <div class="search-pill">
+                            <svg class="search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.6"/>
+                                <path d="M13 13L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                            </svg>
+                            <input
+                                type="text"
+                                class="search-input"
+                                placeholder="Faculty name or course code..."
+                                id="searchInput"
+                                autocomplete="off"
+                                spellcheck="false"
+                            />
+                            <button type="submit" class="search-btn" id="searchButton">
+                                <span class="btn-label">Search</span>
+                                <span class="btn-spinner" id="spinner"></span>
+                            </button>
+                        </div>
+                        <div id="suggestions-dropdown" class="autocomplete-dropdown"></div>
                     </div>
                 </form>
+
             </div>
-            
-            <div class="card-footer">
-                <div>
-                    <span class="footer-text">Built by Mueen</span>
-                    <span class="separator">|</span>
-                    <a href="https://www.facebook.com/mueen.ahmmed.7" target="_blank" class="footer-link">Send me feedback</a>
+
+            <div class="card-foot">
+                <span class="foot-copy">Built by Mueen</span>
+                <div class="foot-links">
+                    <a href="https://www.facebook.com/mueen.ahmmed.7" target="_blank" class="foot-link">Feedback</a>
+                    <span class="sep">·</span>
+                    <button class="foot-link foot-btn" onclick="openSupportCard()">☕ Coffee</button>
                 </div>
-                
             </div>
         </div>
-        
-        <!-- Course Rating Card (Leaderboard) - Stays visible when faculty review is shown -->
-        <div id="courseRatingArea" style="display: none; margin-top: 32px;"></div>
-        
-        <!-- Individual Faculty Review Card - Appears below rating card -->
-        <div id="facultyReviewArea" style="display: none; margin-top: 32px;"></div>
-        
-        <div id="aboutArea" style="display: none; margin-top: 32px;"></div>
-    </div>
-    
-    <!-- Success/Error Toast -->
+
+        <!-- ── RESULT AREAS ── -->
+        <div id="courseRatingArea" class="result-area"></div>
+        <div id="facultyReviewArea" class="result-area"></div>
+        <div id="aboutArea" class="result-area"></div>
+
+    </main>
+
+    <!-- Toast -->
     <div class="toast" id="toast"></div>
-    
-    <!-- Coffee Support Backdrop (iOS Sheet Style) -->
-    <div class="support-backdrop" id="supportBackdrop">
-        <div class="support-card" onclick="event.stopPropagation()">
-            <div class="support-header">
-                <button class="support-close" id="supportCloseBtn">×</button>
-                <h3 class="support-headline">You can buy me a sugar-free coffee. I won't mind! 😉
-                               (it's just 20tk in the BRACU cafeteria)</h3>
-            </div>
-            <div class="support-body">
-                <div class="number-glass-container">
-                    <div class="payment-indicators">
-                        <span class="payment-badge">Bkash</span>
-                        <span class="payment-badge">Nagad</span>
-                    </div>
-                    <div class="phone-number">01908341690</div>
-                    <button class="copy-button" id="copyNumberBtn">Copy Number</button>
+
+    <!-- ── COFFEE SHEET ── -->
+    <div class="backdrop" id="supportBackdrop" onclick="closeSupportCard()">
+        <div class="bottom-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-knob"></div>
+            <div class="sheet-head">
+                <div>
+                    <h3 class="sheet-title">Buy me a coffee if you want 🤓</h3>
+                    <p class="sheet-sub">Sugar-free, BRACU cafeteria style (just 20tk)</p>
                 </div>
-                <p class="support-footer-note">This is optional. Thank you! ☕</p>
+                <button class="close-btn" id="supportCloseBtn">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+            <div class="sheet-body">
+                <div class="payment-card">
+                    <div class="pay-methods">
+                        <span class="pay-chip">Bkash</span>
+                        <span class="pay-chip">Nagad</span>
+                    </div>
+                    <div class="pay-number">01908341690</div>
+                    <button class="pill-btn pill-btn--white" id="copyNumberBtn">Copy Number</button>
+                </div>
+                <p class="sheet-note">Totally optional. Thank you </p>
             </div>
         </div>
     </div>
-    
-    <!-- Student Review Modal (iOS Sheet Style) -->
-    <div class="review-modal-backdrop" id="reviewBackdrop">
-        <div class="review-modal-sheet" onclick="event.stopPropagation()">
-            <!-- Email Login Step -->
-            <div class="review-modal-step" id="emailLoginStep">
-                <div class="support-header">
-                    <button class="support-close" id="reviewCloseBtn1">×</button>
-                    <h3 class="support-headline">Sign in with BRACU Email</h3>
+
+    <!-- ── REVIEW MODAL ── -->
+    <div class="backdrop" id="reviewBackdrop">
+        <div class="bottom-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-knob"></div>
+
+            <!-- Step 1: Email -->
+            <div id="emailLoginStep">
+                <div class="sheet-head">
+                    <div>
+                        <h3 class="sheet-title">Verify your identity</h3>
+                        <p class="sheet-sub">Your identity is never shown with your review.</p>
+                    </div>
+                    <button class="close-btn" id="reviewCloseBtn1">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    </button>
                 </div>
-                <div class="support-body">
-                    <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 1rem;">
-                        Your G Suite Email Address is required for verification only. Your identity is never shown with your review.
-                    </p>
-                    <input 
-                        type="email" 
-                        id="reviewEmailInput" 
-                        class="review-input" 
+                <div class="sheet-body">
+                    <input
+                        type="email"
+                        id="reviewEmailInput"
+                        class="form-input"
                         placeholder="your.name@g.bracu.ac.bd"
                         autocomplete="email"
                     />
-                    <button class="review-submit-btn" id="emailContinueBtn">Continue</button>
+                    <button class="pill-btn pill-btn--white full-w" id="emailContinueBtn">Continue →</button>
                 </div>
             </div>
-            
-            <!-- Review Form Step -->
-            <div class="review-modal-step" id="reviewFormStep" style="display: none;">
-                <div class="support-header">
-                    <button class="support-close" id="reviewCloseBtn2">×</button>
-                    <h3 class="support-headline" id="reviewFacultyName">Review Faculty</h3>
+
+            <!-- Step 2: Form -->
+            <div id="reviewFormStep" style="display:none;">
+                <div class="sheet-head">
+                    <div>
+                        <h3 class="sheet-title" id="reviewFacultyName">Leave a Review</h3>
+                        <p class="sheet-sub">Be honest. Future students depend on this.</p>
+                    </div>
+                    <button class="close-btn" id="reviewCloseBtn2">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    </button>
                 </div>
-                <div class="support-body">
-                    <!-- Course Code (Optional) -->
-                    <label class="review-label">Course Code (optional)</label>
-                    <input 
-                        type="text" 
-                        id="reviewCourseCode" 
-                        class="review-input" 
-                        placeholder="e.g., CSE110"
-                        style="margin-bottom: 1.5rem;"
-                    />
-                    
-                    <!-- Teaching Quality Slider -->
-                    <label class="review-label">Teaching Quality</label>
-                    <div class="slider-container">
-                        <input 
-                            type="range" 
-                            id="teachingSlider" 
-                            class="rating-slider" 
-                            min="1" 
-                            max="10" 
-                            step="0.5" 
-                            value="5"
-                        />
-                        <span class="slider-value" id="teachingValue">5.0</span>
+                <div class="sheet-body">
+                    <label class="form-label">Course Code <span class="optional">(optional)</span></label>
+                    <input type="text" id="reviewCourseCode" class="form-input" placeholder="e.g., CSE110"/>
+
+                    <label class="form-label">Teaching Quality</label>
+                    <div class="slider-row">
+                        <input type="range" id="teachingSlider" class="slider" min="1" max="10" step="0.5" value="5"/>
+                        <span class="slider-val" id="teachingValue">5.0</span>
                     </div>
-                    
-                    <!-- Marking Fairness Slider -->
-                    <label class="review-label">Marking Fairness</label>
-                    <div class="slider-container">
-                        <input 
-                            type="range" 
-                            id="markingSlider" 
-                            class="rating-slider" 
-                            min="1" 
-                            max="10" 
-                            step="0.5" 
-                            value="5"
-                        />
-                        <span class="slider-value" id="markingValue">5.0</span>
+
+                    <label class="form-label">Marking Fairness</label>
+                    <div class="slider-row">
+                        <input type="range" id="markingSlider" class="slider" min="1" max="10" step="0.5" value="5"/>
+                        <span class="slider-val" id="markingValue">5.0</span>
                     </div>
-                    
-                    <!-- Behavior & Attitude Slider -->
-                    <label class="review-label">Behavior & Attitude</label>
-                    <div class="slider-container">
-                        <input 
-                            type="range" 
-                            id="behaviorSlider" 
-                            class="rating-slider" 
-                            min="1" 
-                            max="10" 
-                            step="0.5" 
-                            value="5"
-                        />
-                        <span class="slider-value" id="behaviorValue">5.0</span>
+
+                    <label class="form-label">Behavior & Attitude</label>
+                    <div class="slider-row">
+                        <input type="range" id="behaviorSlider" class="slider" min="1" max="10" step="0.5" value="5"/>
+                        <span class="slider-val" id="behaviorValue">5.0</span>
                     </div>
-                    
-                    <!-- Feedback Textarea -->
-                    <label class="review-label">Your Experience (3-500 characters)</label>
-                    <textarea 
-                        id="reviewFeedback" 
-                        class="review-textarea" 
-                        placeholder="Share your experience with this faculty member..."
-                        maxlength="500"
-                    ></textarea>
-                    <div class="char-counter" id="charCounter">0/500</div>
-                    
-                    <button class="review-submit-btn" id="submitReviewBtn">Submit Review</button>
+
+                    <label class="form-label">Your Experience <span class="optional">(3–500 chars)</span></label>
+                    <textarea id="reviewFeedback" class="form-textarea" placeholder="Share what you actually experienced..." maxlength="500"></textarea>
+                    <div class="char-count" id="charCounter">0 / 500</div>
+
+                    <button class="pill-btn pill-btn--white full-w" id="submitReviewBtn">Submit Review</button>
                 </div>
             </div>
+
         </div>
     </div>
-    
+
     <script src="script.js"></script>
 </body>
 </html>
