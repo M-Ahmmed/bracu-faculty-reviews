@@ -6,7 +6,16 @@
 const supabaseUrl = 'https://mbmgmqignuqgixsabkwv.supabase.co';
 const supabaseKey = 'sb_publishable_sUnVlxyJ0hNbb6qn6KJDwg_PVpp_39b';
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
-
+//=======added new//
+async function logSearch(query, type, matched) {
+    try {
+        await _supabase.from('search_logs').insert({
+            query: query,
+            query_type: type,
+            matched: matched
+        });
+    } catch { }
+}
 // ── 2. DOM REFS ──
 const searchForm      = document.getElementById('searchForm');
 const searchInput     = document.getElementById('searchInput');
@@ -255,7 +264,7 @@ async function handleCourseSearch(code) {
         const courses = f.faculty_reviews.split('|')[3]?.trim() || '';
         return courses.split(',').map(c => c.trim()).includes(code);
     });
-
+await logSearch(code, 'course', matching.length > 0);
     if (!matching.length) {
         showResult(courseRatingArea, `
             <div class="card slide-up">
@@ -347,6 +356,8 @@ async function handleFacultySearch(input, keepLeaderboard = false) {
             .maybeSingle();
         if (data && !error) faculty = data;
     }
+    
+    await logSearch(input, 'faculty', faculty !== null);
 
     if (!faculty) {
         if (!keepLeaderboard) {
