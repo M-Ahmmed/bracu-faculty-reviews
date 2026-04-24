@@ -18,13 +18,59 @@
     <div class="bg-photo"></div>
     <div class="bg-overlay"></div>
 
+    <!-- ── AUTH OVERLAY (Hard-Lock) ── -->
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-card">
+
+            <!-- Top bar -->
+            <div class="auth-header">
+                <div class="auth-header-logo">
+                    <div class="auth-header-icon" aria-hidden="true">
+    <svg class="auth-mini-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.7"/>
+        <path d="M13 13L17 17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+    </svg>
+</div>
+                    <span class="auth-header-name"></span>
+                </div>
+                <span class="auth-header-badge">Sign In</span>
+            </div>
+
+            <!-- Main body -->
+            <div class="auth-body">
+            <h2 class="auth-title">Find faculty Reviews.</h2>
+                <p class="auth-sub">Onetime enter your G Suite Email prefix to continue. Your identity stays private.</p>
+
+                <div class="auth-input-wrap">
+                    <input
+                        type="text"
+                        id="authPrefixInput"
+                        class="auth-prefix-input"
+                        placeholder="Only type the part before"
+                        autocomplete="off"
+                        spellcheck="false"
+                        autocapitalize="none"
+                    />
+                    <span class="auth-suffix">@g.bracu.ac.bd</span>
+                </div>
+                <div class="auth-hint" id="authHint"></div>
+
+                <button class="auth-submit-btn" id="authSubmitBtn">Continue →</button>
+            </div>
+
+            <!-- Footer note -->
+            <div class="auth-card-foot">
+                <p class="auth-note">New device or incognito? Re-enter.</p>
+            </div>
+
+        </div>
+    </div>
+
     <main class="container">
 
         <!-- ── SEARCH CARD ── -->
         <div class="card card-search" id="mainLandingCard">
             <div class="search-body">
-
-                
 
                 <h1 class="headline" id="typewriterText"></h1>
 
@@ -118,7 +164,7 @@
         <div class="bottom-sheet" onclick="event.stopPropagation()">
             <div class="sheet-knob"></div>
 
-            <!-- Step 1: Email -->
+            <!-- Step 1: Email (kept for fallback, but now auto-filled from auth) -->
             <div id="emailLoginStep">
                 <div class="sheet-head">
                     <div>

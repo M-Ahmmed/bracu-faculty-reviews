@@ -6,52 +6,210 @@
 const supabaseUrl = 'https://mbmgmqignuqgixsabkwv.supabase.co';
 const supabaseKey = 'sb_publishable_sUnVlxyJ0hNbb6qn6KJDwg_PVpp_39b';
 const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
-//=======added new//
-async function logSearch(query, type, matched) {
-    try {
-        await _supabase.from('search_logs').insert({
-            query: query,
-            query_type: type,
-            matched: matched
-        });
-    } catch { }
+
+// ── 2. AUTH STATE ──
+// currentUser holds { username, full_email } after login
+let currentUser = null;
+
+// ── 3. HANDLE AUTH (runs immediately on load) ──
+async function handleAuth() {
+    const overlay = document.getElementById('authOverlay');
+    const input   = document.getElementById('authPrefixInput');
+    const hint    = document.getElementById('authHint');
+    const btn     = document.getElementById('authSubmitBtn');
+
+    // Check localStorage first
+    const saved = localStorage.getItem('bracu_user');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            if (parsed.username && parsed.full_email) {
+                currentUser = parsed;
+                // Upsert profile (increments total_visits)
+                await upsertProfile(parsed.username, parsed.full_email);
+                overlay.classList.add('hidden');
+                return;
+            }
+        } catch (_) { /* corrupt data, re-login */ }
+    }
+
+    // Show overlay
+    overlay.classList.remove('hidden');
+    input.focus();
+
+    // Live suffix hint: show greyed full email as user types
+    input.addEventListener('input', () => {
+        hint.textContent = '';
+        hint.className = 'auth-hint';
+    });
+
+    // Submit logic
+    async function doLogin() {
+        const prefix = input.value.trim().toLowerCase();
+
+        // Validation: at least 3 chars, no @ or spaces
+        if (prefix.length < 3) {
+            hint.textContent = 'Enter at least 3 characters';
+            hint.className = 'auth-hint';
+            return;
+        }
+        if (/[@\s]/.test(prefix)) {
+            hint.textContent = 'Only type the part before @';
+            hint.className = 'auth-hint';
+            return;
+        }
+
+        const full_email = prefix + '@g.bracu.ac.bd';
+        const username   = prefix;
+
+        btn.disabled = true;
+        btn.textContent = 'Signing in…';
+
+        try {
+            await upsertProfile(username, full_email);
+
+            currentUser = { username, full_email };
+            localStorage.setItem('bracu_user', JSON.stringify(currentUser));
+            // Keep legacy key for review modal backward compat
+            localStorage.setItem('bracu_user_email', full_email);
+
+            // Welcome toast
+            const isNew = !(await checkIsReturning(username));
+            overlay.classList.add('hidden');
+
+            setTimeout(() => {
+                showToast(isNew
+                    ? `Welcome, ${username}! 👋`
+                    : `Welcome back, ${username}!`, 'success');
+            }, 350);
+
+        } catch (err) {
+            hint.textContent = 'Something went wrong. Try again.';
+            hint.className = 'auth-hint';
+            btn.disabled = false;
+            btn.textContent = 'Continue →';
+        }
+    }
+
+    btn.addEventListener('click', doLogin);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
+    });
 }
-// ── 2. DOM REFS ──
-const searchForm      = document.getElementById('searchForm');
-const searchInput     = document.getElementById('searchInput');
-const searchButton    = document.getElementById('searchButton');
-const courseRatingArea = document.getElementById('courseRatingArea');
+
+// Returns true if profile already had visits > 1 before this session
+async function checkIsReturning(username) {
+    try {
+        const { data } = await _supabase
+            .from('student_profiles')
+            .select('total_visits')
+            .eq('username', username)
+            .maybeSingle();
+        return data && data.total_visits > 1;
+    } catch { return false; }
+}
+
+async function upsertProfile(username, full_email) {
+    await _supabase.rpc('upsert_student_profile', {
+        p_username: username,
+        p_full_email: full_email
+    });
+}
+
+// ── 4. ACTIVITY LOGGER ──
+async function logActivity(type, detail = {}) {
+    if (!currentUser || !currentUser.username) return;
+
+    try {
+        let eventType = type;
+        let targetType = detail.target_type || 'site';
+        let targetId = detail.target_id != null ? String(detail.target_id) : null;
+        let eventLabel = detail.event_label || null;
+        let metadata = detail.metadata || {};
+
+        if (type === 'search') {
+            eventType = 'search';
+            targetType = detail.query_type || 'unknown';
+            targetId = detail.query != null ? String(detail.query) : null;
+            eventLabel = detail.query != null ? String(detail.query) : null;
+            metadata = {
+                matched: !!detail.matched
+            };
+        }
+
+        if (type === 'faculty_open') {
+            eventType = 'faculty_open';
+            targetType = 'faculty';
+            targetId = detail.faculty_id != null ? String(detail.faculty_id) : null;
+            eventLabel = detail.faculty_name || detail.event_label || null;
+            metadata = detail.metadata || {};
+        }
+
+        if (type === 'review_create' || type === 'review_update') {
+            eventType = type;
+            targetType = 'faculty';
+            targetId = detail.faculty_id != null ? String(detail.faculty_id) : null;
+            eventLabel = detail.faculty_name || detail.event_label || null;
+            metadata = {
+                course_code: detail.course_code || null
+            };
+        }
+
+        await _supabase.rpc('record_user_activity', {
+            p_username: currentUser.username,
+            p_event_type: eventType,
+            p_target_type: targetType,
+            p_target_id: targetId,
+            p_event_label: eventLabel,
+            p_metadata: metadata
+        });
+
+    } catch (err) {
+        console.warn('logActivity error:', err);
+    }
+}
+
+// Legacy wrapper used by course/faculty search (kept for compatibility)
+async function logSearch(query, type, matched) {
+    await logActivity('search', { query, query_type: type, matched });
+}
+
+// ── 5. DOM REFS ──
+const searchForm        = document.getElementById('searchForm');
+const searchInput       = document.getElementById('searchInput');
+const searchButton      = document.getElementById('searchButton');
+const courseRatingArea  = document.getElementById('courseRatingArea');
 const facultyReviewArea = document.getElementById('facultyReviewArea');
-const spinner         = document.getElementById('spinner');
-const toastEl         = document.getElementById('toast');
-const supportBackdrop = document.getElementById('supportBackdrop');
-const supportCloseBtn = document.getElementById('supportCloseBtn');
-const copyNumberBtn   = document.getElementById('copyNumberBtn');
-const reviewBackdrop  = document.getElementById('reviewBackdrop');
-const emailLoginStep  = document.getElementById('emailLoginStep');
-const reviewFormStep  = document.getElementById('reviewFormStep');
-const reviewCloseBtn1 = document.getElementById('reviewCloseBtn1');
-const reviewCloseBtn2 = document.getElementById('reviewCloseBtn2');
-const emailContinueBtn = document.getElementById('emailContinueBtn');
-const reviewEmailInput = document.getElementById('reviewEmailInput');
-const teachingSlider  = document.getElementById('teachingSlider');
-const markingSlider   = document.getElementById('markingSlider');
-const behaviorSlider  = document.getElementById('behaviorSlider');
-const teachingValue   = document.getElementById('teachingValue');
-const markingValue    = document.getElementById('markingValue');
-const behaviorValue   = document.getElementById('behaviorValue');
-const reviewFeedback  = document.getElementById('reviewFeedback');
-const charCounter     = document.getElementById('charCounter');
-const submitReviewBtn = document.getElementById('submitReviewBtn');
+const spinner           = document.getElementById('spinner');
+const toastEl           = document.getElementById('toast');
+const supportBackdrop   = document.getElementById('supportBackdrop');
+const supportCloseBtn   = document.getElementById('supportCloseBtn');
+const copyNumberBtn     = document.getElementById('copyNumberBtn');
+const reviewBackdrop    = document.getElementById('reviewBackdrop');
+const emailLoginStep    = document.getElementById('emailLoginStep');
+const reviewFormStep    = document.getElementById('reviewFormStep');
+const reviewCloseBtn1   = document.getElementById('reviewCloseBtn1');
+const reviewCloseBtn2   = document.getElementById('reviewCloseBtn2');
+const emailContinueBtn  = document.getElementById('emailContinueBtn');
+const reviewEmailInput  = document.getElementById('reviewEmailInput');
+const teachingSlider    = document.getElementById('teachingSlider');
+const markingSlider     = document.getElementById('markingSlider');
+const behaviorSlider    = document.getElementById('behaviorSlider');
+const teachingValue     = document.getElementById('teachingValue');
+const markingValue      = document.getElementById('markingValue');
+const behaviorValue     = document.getElementById('behaviorValue');
+const reviewFeedback    = document.getElementById('reviewFeedback');
+const charCounter       = document.getElementById('charCounter');
+const submitReviewBtn   = document.getElementById('submitReviewBtn');
 const reviewFacultyName = document.getElementById('reviewFacultyName');
 const reviewCourseCode  = document.getElementById('reviewCourseCode');
 
-let currentCourseCode  = null;
-let currentFacultyForReview = null;
-let currentReviewOffset = 0;
-let currentDisplayedFaculty = null;
+let currentCourseCode         = null;
+let currentFacultyForReview   = null;
+let currentReviewOffset       = 0;
+let currentDisplayedFaculty   = null;
 
-// ── 3. TYPEWRITER ──
+// ── 6. TYPEWRITER ──
 const typewriterEl = document.getElementById('typewriterText');
 const HEADLINE = "Find your faculty.";
 let charIdx = 0;
@@ -66,7 +224,7 @@ let charIdx = 0;
     }
 })();
 
-// ── 4. RATING HELPERS ──
+// ── 7. RATING HELPERS ──
 function getScoreClass(score) {
     const s = parseFloat(score);
     if (isNaN(s)) return '';
@@ -95,7 +253,7 @@ function getVerdictInfo(teaching, marking, behavior) {
     return           { label: 'Proceed with Caution',       cls: 'verdict--red' };
 }
 
-// ── 5. DATA LOADING ──
+// ── 8. DATA LOADING ──
 let allFaculty = [];
 let fuse = null;
 
@@ -118,8 +276,8 @@ async function loadFacultyData() {
 
         fuse = new Fuse(searchable, {
             keys: [
-                { name: 'fullName', weight: 0.6 },
-                { name: 'initial',  weight: 0.3 },
+                { name: 'fullName',     weight: 0.6 },
+                { name: 'initial',      weight: 0.3 },
                 { name: 'faculty_name', weight: 0.1 },
             ],
             threshold: 0.4,
@@ -134,9 +292,13 @@ async function loadFacultyData() {
     }
 }
 
-loadFacultyData();
+// ── 9. INIT ORDER: Auth first, then data ──
+(async function init() {
+    await handleAuth();  // blocks until user is authenticated
+    loadFacultyData();   // non-blocking after auth
+})();
 
-// ── 6. AUTOCOMPLETE ──
+// ── 10. AUTOCOMPLETE ──
 const acDropdown = document.getElementById('suggestions-dropdown');
 let debounceTimer = null;
 
@@ -219,7 +381,7 @@ function hideAC() {
     acDropdown.innerHTML = '';
 }
 
-// ── 7. SEARCH FORM ──
+// ── 11. SEARCH FORM ──
 searchForm.addEventListener('submit', async e => {
     e.preventDefault();
     hideAC();
@@ -256,7 +418,7 @@ searchForm.addEventListener('submit', async e => {
     }
 });
 
-// ── 8. COURSE CODE SEARCH ──
+// ── 12. COURSE CODE SEARCH ──
 async function handleCourseSearch(code) {
     currentCourseCode = code;
     const matching = allFaculty.filter(f => {
@@ -264,7 +426,9 @@ async function handleCourseSearch(code) {
         const courses = f.faculty_reviews.split('|')[3]?.trim() || '';
         return courses.split(',').map(c => c.trim()).includes(code);
     });
-await logSearch(code, 'course', matching.length > 0);
+
+    await logSearch(code, 'course', matching.length > 0);
+
     if (!matching.length) {
         showResult(courseRatingArea, `
             <div class="card slide-up">
@@ -332,9 +496,16 @@ await logSearch(code, 'course', matching.length > 0);
     }, 60);
 }
 
-window.searchFaculty = name => handleFacultySearch(name, true);
+window.searchFaculty = name => {
+    logActivity('faculty_open', {
+        faculty_name: name,
+        event_label: name
+    });
 
-// ── 9. FACULTY NAME SEARCH ──
+    handleFacultySearch(name, true);
+};
+
+// ── 13. FACULTY NAME SEARCH ──
 async function handleFacultySearch(input, keepLeaderboard = false) {
     let faculty = null;
     const len = input.length;
@@ -356,7 +527,7 @@ async function handleFacultySearch(input, keepLeaderboard = false) {
             .maybeSingle();
         if (data && !error) faculty = data;
     }
-    
+
     await logSearch(input, 'faculty', faculty !== null);
 
     if (!faculty) {
@@ -380,7 +551,7 @@ async function handleFacultySearch(input, keepLeaderboard = false) {
     await displayFaculty(faculty, keepLeaderboard);
 }
 
-// ── 10. VOTE SYSTEM ──
+// ── 14. VOTE SYSTEM ──
 async function handleVote(id, type) {
     const key = `vote_${id}`;
     const current = localStorage.getItem(key);
@@ -388,30 +559,79 @@ async function handleVote(id, type) {
     const downEl = document.querySelector(`#vote-down-${id}`);
     const cntEl  = document.querySelector(`#vote-count-${id}`);
 
-    let change = 0, next = null;
+    let change = 0;
+    let next = null;
 
     if (type === 'up') {
-        if (current === 'up')   { change = -1; upEl.classList.remove('active'); }
-        else if (current === 'down') { change = 2; next = 'up'; downEl.classList.remove('active'); upEl.classList.add('active'); }
-        else                    { change = 1;  next = 'up'; upEl.classList.add('active'); }
+        if (current === 'up') {
+            change = -1;
+            next = null;
+            upEl?.classList.remove('active');
+        } else if (current === 'down') {
+            change = 2;
+            next = 'up';
+            downEl?.classList.remove('active');
+            upEl?.classList.add('active');
+        } else {
+            change = 1;
+            next = 'up';
+            upEl?.classList.add('active');
+        }
     } else {
-        if (current === 'down') { change = 1;  downEl.classList.remove('active'); }
-        else if (current === 'up')   { change = -2; next = 'down'; upEl.classList.remove('active'); downEl.classList.add('active'); }
-        else                    { change = -1; next = 'down'; downEl.classList.add('active'); }
+        if (current === 'down') {
+            change = 1;
+            next = null;
+            downEl?.classList.remove('active');
+        } else if (current === 'up') {
+            change = -2;
+            next = 'down';
+            upEl?.classList.remove('active');
+            downEl?.classList.add('active');
+        } else {
+            change = -1;
+            next = 'down';
+            downEl?.classList.add('active');
+        }
     }
 
-    next ? localStorage.setItem(key, next) : localStorage.removeItem(key);
+    if (next) {
+        localStorage.setItem(key, next);
+    } else {
+        localStorage.removeItem(key);
+    }
 
     try {
-        const { data, error } = await _supabase.rpc('increment_vote', { review_id: id, vote_change: change });
+        const { data, error } = await _supabase.rpc('increment_vote', {
+            review_id: id,
+            vote_change: change
+        });
+
         if (error) throw error;
+
         if (cntEl) cntEl.textContent = data ?? 0;
-    } catch {
+
+        if (currentUser && currentUser.username) {
+            await _supabase.rpc('set_user_vote_state', {
+                p_username: currentUser.username,
+                p_faculty_id: id,
+                p_vote_type: next || 'none'
+            });
+        }
+
+    } catch (err) {
         showToast('Vote failed. Try again.', 'error');
-        // Revert
-        if (next === 'up')   upEl.classList.remove('active');
-        if (next === 'down') downEl.classList.remove('active');
-        current ? localStorage.setItem(key, current) : localStorage.removeItem(key);
+
+        if (next === 'up') upEl?.classList.remove('active');
+        if (next === 'down') downEl?.classList.remove('active');
+
+        if (current === 'up') upEl?.classList.add('active');
+        if (current === 'down') downEl?.classList.add('active');
+
+        if (current) {
+            localStorage.setItem(key, current);
+        } else {
+            localStorage.removeItem(key);
+        }
     }
 }
 
@@ -423,12 +643,12 @@ function initVotePill(id) {
 
 window.handleVote = handleVote;
 
-// ── 11. DISPLAY FACULTY ──
+// ── 15. DISPLAY FACULTY ──
 async function displayFaculty(faculty, keepLeaderboard = false) {
     currentDisplayedFaculty = faculty;
     currentReviewOffset = 0;
 
-    const parts = (faculty.faculty_reviews || '').split('|');
+    const parts    = (faculty.faculty_reviews || '').split('|');
     const fullName = parts[0]?.trim() || 'Unknown Faculty';
     const initial  = parts[1]?.trim() || '';
     const email    = parts[2]?.trim() || '';
@@ -440,7 +660,7 @@ async function displayFaculty(faculty, keepLeaderboard = false) {
     const insights = parts[8]?.trim() || '';
 
     const courseArr = courses ? courses.split(',').map(c => c.trim()).filter(Boolean) : [];
-    const verdict = getVerdictInfo(teaching, marking, behavior);
+    const verdict   = getVerdictInfo(teaching, marking, behavior);
     const { reviews, total, hasMore } = await loadReviews(faculty.id, 5, 0);
 
     const courseTags = courseArr.map(c =>
@@ -617,7 +837,7 @@ async function loadMoreReviews(facultyId) {
     currentReviewOffset += 5;
     const { reviews, total, hasMore } = await loadReviews(facultyId, 5, currentReviewOffset);
     const container = document.getElementById(`reviews-container-${facultyId}`);
-    const wrap = document.getElementById(`load-more-wrap-${facultyId}`);
+    const wrap      = document.getElementById(`load-more-wrap-${facultyId}`);
     if (container && reviews.length) {
         container.insertAdjacentHTML('beforeend', reviews.map(buildReviewCard).join(''));
         const remaining = total - (currentReviewOffset + 5);
@@ -629,7 +849,7 @@ async function loadMoreReviews(facultyId) {
 
 window.loadMoreReviews = loadMoreReviews;
 
-// ── 12. STUDENT REVIEWS DB ──
+// ── 16. STUDENT REVIEWS DB ──
 async function loadReviews(facultyId, limit = 5, offset = 0) {
     try {
         const { count } = await _supabase
@@ -651,10 +871,12 @@ async function loadReviews(facultyId, limit = 5, offset = 0) {
     }
 }
 
-// ── 13. REVIEW MODAL ──
+// ── 17. REVIEW MODAL ──
 function openReviewModal(facultyId, facultyName) {
     currentFacultyForReview = { id: facultyId, name: facultyName };
-    const email = localStorage.getItem('bracu_user_email');
+
+    // Prefer auth user email; fallback to legacy stored email
+    const email = currentUser?.full_email || localStorage.getItem('bracu_user_email');
     if (email) {
         emailLoginStep.style.display = 'none';
         reviewFormStep.style.display = 'block';
@@ -709,7 +931,7 @@ async function checkExistingReview(facultyId, email) {
     } catch { /* ignore */ }
 }
 
-// Email step
+// Email step (fallback if somehow auth skipped)
 emailContinueBtn.addEventListener('click', async () => {
     const email = reviewEmailInput.value.trim();
     if (!email) { showToast('Please enter your email', 'error'); return; }
@@ -736,9 +958,11 @@ function updateCharCount(len) {
     charCounter.className = 'char-count' + (len < 3 ? ' err' : len >= 3 ? ' ok' : '');
 }
 
-// Submit
+// Submit review
 submitReviewBtn.addEventListener('click', async () => {
-    const email = localStorage.getItem('bracu_user_email');
+    const email    = currentUser?.full_email || localStorage.getItem('bracu_user_email');
+    const username = currentUser?.username || (email ? email.split('@')[0] : null);
+
     if (!email || !currentFacultyForReview) { showToast('Session expired', 'error'); closeReviewModal(); return; }
 
     const code     = reviewCourseCode.value.trim().toUpperCase() || null;
@@ -761,23 +985,45 @@ submitReviewBtn.addEventListener('click', async () => {
             .eq('student_email', email)
             .maybeSingle();
 
-        if (existing) {
-            const { error } = await _supabase.from('student_reviews').update({
-                course_code: code, teaching_rating: teaching,
-                marking_rating: marking, behavior_rating: behavior,
-                raw_feedback: feedback, updated_at: new Date().toISOString()
-            }).eq('id', existing.id).select();
-            if (error) throw error;
-            showToast('Review updated!', 'success');
-        } else {
+if (existing) {
+    const { error } = await _supabase.from('student_reviews').update({
+        course_code: code,
+        teaching_rating: teaching,
+        marking_rating: marking,
+        behavior_rating: behavior,
+        raw_feedback: feedback,
+        username: username,
+        updated_at: new Date().toISOString()
+    }).eq('id', existing.id).select();
+
+    if (error) throw error;
+
+    showToast('Review updated!', 'success');
+
+    await logActivity('review_update', {
+        faculty_id: currentFacultyForReview.id,
+        faculty_name: currentFacultyForReview.name,
+        course_code: code
+    });
+
+ }else {
             const { error } = await _supabase.from('student_reviews').insert({
-                faculty_id: currentFacultyForReview.id, student_email: email,
-                course_code: code, teaching_rating: teaching,
-                marking_rating: marking, behavior_rating: behavior,
+                faculty_id: currentFacultyForReview.id,
+                student_email: email,
+                username: username,
+                course_code: code,
+                teaching_rating: teaching,
+                marking_rating: marking,
+                behavior_rating: behavior,
                 raw_feedback: feedback
             }).select();
             if (error) throw error;
             showToast('Review submitted!', 'success');
+              await logActivity('review_create', {
+        faculty_id: currentFacultyForReview.id,
+        faculty_name: currentFacultyForReview.name,
+        course_code: code
+    });
         }
 
         closeReviewModal();
@@ -792,14 +1038,14 @@ submitReviewBtn.addEventListener('click', async () => {
     }
 });
 
-// Modal listeners
+// Modal close listeners
 reviewCloseBtn1.addEventListener('click', closeReviewModal);
 reviewCloseBtn2.addEventListener('click', closeReviewModal);
 reviewBackdrop.addEventListener('click', e => { if (e.target === reviewBackdrop) closeReviewModal(); });
 
 window.openReviewModal = openReviewModal;
 
-// ── 14. SHARE LINK ──
+// ── 18. SHARE LINK ──
 async function handleShareLink(facultyId) {
     const url = `${location.origin}${location.pathname}?reviewFaculty=${facultyId}`;
     try {
@@ -811,7 +1057,7 @@ async function handleShareLink(facultyId) {
 }
 window.handleShareLink = handleShareLink;
 
-// ── 15. URL PARAMS ──
+// ── 19. URL PARAMS (Deep linking — preserved intact) ──
 function checkUrlParams() {
     const id = new URLSearchParams(location.search).get('reviewFaculty');
     if (!id) return;
@@ -827,13 +1073,9 @@ function checkUrlParams() {
     setTimeout(() => clearInterval(checkInterval), 6000);
 }
 
-// ── 16. COFFEE SUPPORT ──
-function openSupportCard() {
-    openSheet(supportBackdrop);
-}
-function closeSupportCard() {
-    closeSheet(supportBackdrop);
-}
+// ── 20. COFFEE SUPPORT ──
+function openSupportCard()  { openSheet(supportBackdrop); }
+function closeSupportCard() { closeSheet(supportBackdrop); }
 supportCloseBtn.addEventListener('click', closeSupportCard);
 supportBackdrop.addEventListener('click', e => { if (e.target === supportBackdrop) closeSupportCard(); });
 
@@ -847,10 +1089,10 @@ copyNumberBtn.addEventListener('click', async () => {
     }
 });
 
-window.openSupportCard = openSupportCard;
+window.openSupportCard  = openSupportCard;
 window.closeSupportCard = closeSupportCard;
 
-// ── 17. ABOUT/DISCLAIMER ──
+// ── 21. ABOUT/DISCLAIMER ──
 function toggleAbout() {
     const area = document.getElementById('aboutArea');
     if (area.style.display === 'none' || !area.style.display) {
@@ -899,13 +1141,13 @@ function toggleAbout() {
 }
 window.toggleAbout = toggleAbout;
 
-// ── 18. COURSE TAG CLICK ──
+// ── 22. COURSE TAG CLICK ──
 window.searchCourse = code => {
     searchInput.value = code;
     handleCourseSearch(code);
 };
 
-// ── 19. ESC KEY ──
+// ── 23. ESC KEY ──
 document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     closeSheet(supportBackdrop);
@@ -913,7 +1155,7 @@ document.addEventListener('keydown', e => {
     closeReviewModal();
 });
 
-// ── 20. UTILS ──
+// ── 24. UTILS ──
 function showResult(el, html) {
     el.innerHTML = html;
     el.style.display = 'block';
@@ -940,10 +1182,10 @@ function showToast(msg, type = 'success') {
 
 function timeAgo(ts) {
     const s = Math.floor((Date.now() - new Date(ts)) / 1000);
-    if (s < 60)       return 'just now';
-    if (s < 3600)     return `${Math.floor(s / 60)}m ago`;
-    if (s < 86400)    return `${Math.floor(s / 3600)}h ago`;
-    if (s < 2592000)  return `${Math.floor(s / 86400)}d ago`;
+    if (s < 60)      return 'just now';
+    if (s < 3600)    return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400)   return `${Math.floor(s / 3600)}h ago`;
+    if (s < 2592000) return `${Math.floor(s / 86400)}d ago`;
     return `${Math.floor(s / 2592000)}mo ago`;
 }
 
