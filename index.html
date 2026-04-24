@@ -18,53 +18,49 @@
     <div class="bg-photo"></div>
     <div class="bg-overlay"></div>
 
-    <!-- ── AUTH OVERLAY (Hard-Lock) ── -->
-    <div class="auth-overlay" id="authOverlay">
-        <div class="auth-card">
+<!-- ── AUTH OVERLAY (Soft-Lock Student Signup) ── -->
+<div class="auth-overlay" id="authOverlay">
+    <div class="auth-card">
 
-            <!-- Top bar -->
-            <div class="auth-header">
-                <div class="auth-header-logo">
-                    <div class="auth-header-icon" aria-hidden="true">
-    <svg class="auth-mini-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.7"/>
-        <path d="M13 13L17 17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-    </svg>
-</div>
-                    <span class="auth-header-name"></span>
+        <div class="auth-header">
+            <div class="auth-header-logo">
+                <div class="auth-header-icon" aria-hidden="true">
+                    <svg class="auth-mini-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.7"/>
+                        <path d="M13 13L17 17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                    </svg>
                 </div>
-                <span class="auth-header-badge">Sign In</span>
-            </div>
-
-            <!-- Main body -->
-            <div class="auth-body">
-            <h2 class="auth-title">Find faculty Reviews.</h2>
-                <p class="auth-sub">Onetime enter your G Suite Email prefix to continue. Your identity stays private.</p>
-
-                <div class="auth-input-wrap">
-                    <input
-                        type="text"
-                        id="authPrefixInput"
-                        class="auth-prefix-input"
-                        placeholder="Only type the part before"
-                        autocomplete="off"
-                        spellcheck="false"
-                        autocapitalize="none"
-                    />
-                    <span class="auth-suffix">@g.bracu.ac.bd</span>
-                </div>
-                <div class="auth-hint" id="authHint"></div>
-
-                <button class="auth-submit-btn" id="authSubmitBtn">Continue →</button>
-            </div>
-
-            <!-- Footer note -->
-            <div class="auth-card-foot">
-                <p class="auth-note">New device or incognito? Re-enter.</p>
+                <span class="auth-header-name">Faculty Reviews</span>
             </div>
 
         </div>
+
+        <div class="auth-body">
+            <h2 class="auth-title">Sign up </h2>
+            <p class="auth-sub">Enter your G-Suite email to continue.Your identity stays private.</p>
+
+            <div class="auth-input-wrap" id="authInputWrap">
+                <input
+                    type="text"
+                    id="authPrefixInput"
+                    class="auth-prefix-input"
+                    placeholder="Email prefix"
+                    autocomplete="off"
+                    spellcheck="false"
+                    autocapitalize="none"
+                    inputmode="text"
+                />
+                <span class="auth-suffix">@g.bracu.ac.bd</span>
+            </div>
+
+            <div class="auth-preview" id="authPreview"></div>
+            <div class="auth-hint" id="authHint"></div>
+
+            <button class="auth-submit-btn" id="authSubmitBtn">Continue</button>
+        </div>
+
     </div>
+</div>
 
     <main class="container">
 
