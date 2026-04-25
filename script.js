@@ -912,46 +912,96 @@ async function handleFacultySearch(input, keepLeaderboard = false) {
 }
 
 // ── 15. VOTE SYSTEM ──
+
+async function loadVoteCounts(facultyId) {
+    try {
+        const { data, error } = await _supabase.rpc('get_faculty_vote_counts', {
+            p_faculty_id: facultyId
+        });
+
+        if (error) throw error;
+
+        const row = Array.isArray(data) ? data[0] : data;
+
+        return {
+            upvotes: Number(row?.upvotes || 0),
+            downvotes: Number(row?.downvotes || 0)
+        };
+
+    } catch (err) {
+        console.warn('loadVoteCounts error:', err);
+
+        return {
+            upvotes: 0,
+            downvotes: 0
+        };
+    }
+}
+
+function applyVoteCountsToUI(facultyId, counts) {
+    const upCountEl = document.getElementById(`vote-up-count-${facultyId}`);
+    const downCountEl = document.getElementById(`vote-down-count-${facultyId}`);
+
+    if (upCountEl) upCountEl.textContent = counts.upvotes;
+    if (downCountEl) downCountEl.textContent = counts.downvotes;
+}
+
+async function getCurrentUserVote(facultyId) {
+    if (!currentUser || !currentUser.username) {
+        return localStorage.getItem(`vote_${facultyId}`);
+    }
+
+    try {
+        const { data, error } = await _supabase
+            .from('user_vote_state')
+            .select('vote_type')
+            .eq('username', currentUser.username)
+            .eq('faculty_id', facultyId)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data || data.vote_type === 'none') {
+            localStorage.removeItem(`vote_${facultyId}`);
+            return null;
+        }
+
+        localStorage.setItem(`vote_${facultyId}`, data.vote_type);
+
+        return data.vote_type;
+
+    } catch (err) {
+        console.warn('getCurrentUserVote fallback:', err);
+        return localStorage.getItem(`vote_${facultyId}`);
+    }
+}
+
 async function handleVote(id, type) {
     const key = `vote_${id}`;
 
-    const current = localStorage.getItem(key);
+    const current = await getCurrentUserVote(id);
 
     const upEl   = document.querySelector(`#vote-up-${id}`);
     const downEl = document.querySelector(`#vote-down-${id}`);
-    const cntEl  = document.querySelector(`#vote-count-${id}`);
 
-    let change = 0;
     let next = null;
 
     if (type === 'up') {
         if (current === 'up') {
-            change = -1;
             next = null;
             upEl?.classList.remove('active');
-        } else if (current === 'down') {
-            change = 2;
+        } else {
             next = 'up';
             downEl?.classList.remove('active');
-            upEl?.classList.add('active');
-        } else {
-            change = 1;
-            next = 'up';
             upEl?.classList.add('active');
         }
     } else {
         if (current === 'down') {
-            change = 1;
             next = null;
             downEl?.classList.remove('active');
-        } else if (current === 'up') {
-            change = -2;
+        } else {
             next = 'down';
             upEl?.classList.remove('active');
-            downEl?.classList.add('active');
-        } else {
-            change = -1;
-            next = 'down';
             downEl?.classList.add('active');
         }
     }
@@ -963,49 +1013,54 @@ async function handleVote(id, type) {
     }
 
     try {
-        const { data, error } = await _supabase.rpc('increment_vote', {
-            review_id: id,
-            vote_change: change
-        });
-
-        if (error) throw error;
-
-        if (cntEl) cntEl.textContent = data ?? 0;
-
         if (currentUser && currentUser.username) {
-            await _supabase.rpc('set_user_vote_state', {
+            const { error } = await _supabase.rpc('set_user_vote_state', {
                 p_username: currentUser.username,
                 p_faculty_id: id,
                 p_vote_type: next || 'none'
             });
+
+            if (error) throw error;
         }
 
+        const counts = await loadVoteCounts(id);
+        applyVoteCountsToUI(id, counts);
+
     } catch (err) {
+        console.error('handleVote error:', err);
+
         showToast('Vote failed. Try again.', 'error');
 
-        if (next === 'up') upEl?.classList.remove('active');
-        if (next === 'down') downEl?.classList.remove('active');
+        upEl?.classList.remove('active');
+        downEl?.classList.remove('active');
 
-        if (current === 'up') upEl?.classList.add('active');
-        if (current === 'down') downEl?.classList.add('active');
-
-        if (current) {
-            localStorage.setItem(key, current);
+        if (current === 'up') {
+            upEl?.classList.add('active');
+            localStorage.setItem(key, 'up');
+        } else if (current === 'down') {
+            downEl?.classList.add('active');
+            localStorage.setItem(key, 'down');
         } else {
             localStorage.removeItem(key);
         }
     }
 }
 
-function initVotePill(id) {
-    const saved = localStorage.getItem(`vote_${id}`);
+async function initVotePill(id) {
+    const upEl   = document.querySelector(`#vote-up-${id}`);
+    const downEl = document.querySelector(`#vote-down-${id}`);
+
+    upEl?.classList.remove('active');
+    downEl?.classList.remove('active');
+
+    const saved = await getCurrentUserVote(id);
 
     if (saved === 'up') {
-        document.querySelector(`#vote-up-${id}`)?.classList.add('active');
+        upEl?.classList.add('active');
     }
 
     if (saved === 'down') {
-        document.querySelector(`#vote-down-${id}`)?.classList.add('active');
+        downEl?.classList.add('active');
     }
 }
 
@@ -1034,6 +1089,8 @@ async function displayFaculty(faculty, keepLeaderboard = false) {
     const verdict = getVerdictInfo(teaching, marking, behavior);
 
     const { reviews, total, hasMore } = await loadReviews(faculty.id, 5, 0);
+    
+    const voteCounts = await loadVoteCounts(faculty.id);
 
     const courseTags = courseArr.map(c =>
         `<span class="course-tag" onclick="searchCourse('${escHtml(c)}')">${escHtml(c)}</span>`
@@ -1079,25 +1136,25 @@ async function displayFaculty(faculty, keepLeaderboard = false) {
                 ${buildInsights(insights)}
 
                 <div class="action-row">
-                    <div class="vote-pill">
-                        <button class="vote-btn v-up" id="vote-up-${faculty.id}" onclick="handleVote(${faculty.id},'up')">
-                            <svg class="vote-arrow" viewBox="0 0 24 24">
-                                <path d="M12 4l-8 8h5v8h6v-8h5z"/>
-                            </svg>
-                            Agree
-                        </button>
+<div class="vote-pill">
+    <button class="vote-btn v-up" id="vote-up-${faculty.id}" onclick="handleVote(${faculty.id},'up')">
+        <svg class="vote-arrow" viewBox="0 0 24 24">
+            <path d="M12 4l-8 8h5v8h6v-8h5z"/>
+        </svg>
+        Agree
+        <span class="vote-count-mini" id="vote-up-count-${faculty.id}">${voteCounts.upvotes}</span>
+    </button>
 
-                        <span class="vote-count" id="vote-count-${faculty.id}">${faculty.vote_score || 0}</span>
+    <div class="vote-divider"></div>
 
-                        <div class="vote-divider"></div>
-
-                        <button class="vote-btn v-down" id="vote-down-${faculty.id}" onclick="handleVote(${faculty.id},'down')">
-                            Disagree
-                            <svg class="vote-arrow" viewBox="0 0 24 24">
-                                <path d="M12 20l8-8h-5V4H9v8H4z"/>
-                            </svg>
-                        </button>
-                    </div>
+    <button class="vote-btn v-down" id="vote-down-${faculty.id}" onclick="handleVote(${faculty.id},'down')">
+        Disagree
+        <span class="vote-count-mini" id="vote-down-count-${faculty.id}">${voteCounts.downvotes}</span>
+        <svg class="vote-arrow" viewBox="0 0 24 24">
+            <path d="M12 20l8-8h-5V4H9v8H4z"/>
+        </svg>
+    </button>
+</div>
 
                     <div class="action-btns">
                         <button class="pill-btn" onclick="openReviewModal(${faculty.id},'${escHtml(fullName).replace(/'/g, "\\'")}')">
