@@ -894,9 +894,9 @@ async function handleFacultySearch(input, keepLeaderboard = false) {
                 <div class="card slide-up">
                     <div class="card-body">
                         <div class="empty-state">
-                            <span class="empty-icon">🙈</span>
+                            <span class="empty-icon">💔🥀</span>
                             <p class="empty-title">"${escHtml(input)}" isn't listed yet.</p>
-                            <p class="empty-desc">I'm adding faculty in weekly waves, prioritized by demand. Drop the name in the Facebook comments or use the Feedback button — it helps a lot.</p>
+                            <p class="empty-desc">Please send me the faculty name through the Feedback button. I’m adding entries one by one 😭 so it may take a little time — stay tuned.</p>
                         </div>
                     </div>
                 </div>

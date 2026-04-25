@@ -218,6 +218,18 @@ function getFilteredSortedRows() {
     const sort = sortSelect.value;
 
     rows.sort((a, b) => {
+        if (sort === 'recent_visit') {
+            return getTimeValue(getRecentVisitTime(b)) - getTimeValue(getRecentVisitTime(a));
+        }
+
+        if (sort === 'recent_action') {
+            return getTimeValue(b.last_action_time) - getTimeValue(a.last_action_time);
+        }
+
+        if (sort === 'newest_signup') {
+            return getTimeValue(b.first_seen) - getTimeValue(a.first_seen);
+        }
+
         if (sort === 'visits') {
             return getVisits(b) - getVisits(a);
         }
@@ -238,14 +250,26 @@ function getFilteredSortedRows() {
             return Number(b.total_review_actions || 0) - Number(a.total_review_actions || 0);
         }
 
-        if (sort === 'recent') {
-            return new Date(getLastSeen(b) || 0) - new Date(getLastSeen(a) || 0);
-        }
-
-        return 0;
+        return getTimeValue(getRecentVisitTime(b)) - getTimeValue(getRecentVisitTime(a));
     });
 
     return rows;
+}
+
+function getRecentVisitTime(row) {
+    if (currentMode === 'daily') {
+        return row.last_seen_that_day || row.last_seen_at || row.last_visited_at || row.last_action_time;
+    }
+
+    return row.last_seen_that_week || row.last_seen_at || row.last_visited_at || row.last_action_time;
+}
+
+function getTimeValue(value) {
+    if (!value) return 0;
+
+    const time = new Date(value).getTime();
+
+    return Number.isNaN(time) ? 0 : time;
 }
 
 function renderUsers() {
@@ -265,6 +289,7 @@ function renderUsers() {
         const votes = Number(row.total_vote_actions || 0);
         const reviews = Number(row.total_review_actions || 0);
         const lastAction = row.last_action || 'none';
+        const lastSeen = getRecentVisitTime(row);
 
         return `
             <button class="user-row ${row.username === selectedUsername ? 'active' : ''}" data-username="${escAttr(row.username)}">
@@ -273,12 +298,13 @@ function renderUsers() {
                     <div class="user-email">${escHtml(row.full_email || '')}</div>
 
                     <div class="user-badges">
-                        <span class="badge blue">${searches} searches</span>
-                        <span class="badge ${failed ? 'red' : 'green'}">${failed} failed</span>
-                        <span class="badge yellow">${votes} votes</span>
-                        <span class="badge green">${reviews} reviews</span>
-                        <span class="badge">${escHtml(lastAction)}</span>
-                    </div>
+    <span class="badge blue">${searches} searches</span>
+    <span class="badge ${failed ? 'red' : 'green'}">${failed} failed</span>
+    <span class="badge yellow">${votes} votes</span>
+    <span class="badge green">${reviews} reviews</span>
+    <span class="badge">${escHtml(lastAction)}</span>
+    <span class="badge">last seen ${formatTime(lastSeen)}</span>
+</div>
                 </div>
 
                 <div class="user-side">
