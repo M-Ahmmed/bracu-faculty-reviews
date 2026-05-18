@@ -8,10 +8,13 @@
     <meta property="og:description" content="Find your faculty before registration. Real data from real students.">
     <meta name="theme-color" content="#000000">
     <title>BRACU Faculty Reviews</title>
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preload" as="image" href="bracu-campus-bg.webp" type="image/webp" media="(min-width: 481px)" fetchpriority="low">
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 </head>
 <body>
 
@@ -67,6 +70,21 @@
         <!-- ── SEARCH CARD ── -->
         <div class="card card-search" id="mainLandingCard">
             <div class="search-body">
+                <div class="hero-topline">
+                    <button class="profile-chip profile-chip--icon" id="profileChip" type="button" aria-label="Open your profile" title="Your profile" style="display:none;">
+                        <span class="profile-chip-avatar" aria-hidden="true">
+                            <img
+                                id="profileAvatar"
+                                src="assets/profile-avatars/avatar-1.svg"
+                                alt=""
+                                decoding="async"
+                            />
+                            <span class="profile-active-dot" aria-hidden="true"></span>
+                            <span class="profile-chip-badge" id="profileUnreadBadge" style="display:none;">0</span>
+                        </span>
+                        <span class="profile-chip-you">You</span>
+                    </button>
+                </div>
 
                 <h1 class="headline" id="typewriterText"></h1>
 
@@ -227,6 +245,117 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+
+    <!-- ── ADD MISSING FACULTY SHEET ── -->
+    <div class="backdrop" id="addFacultyBackdrop">
+        <div class="bottom-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-knob"></div>
+            <div class="sheet-head">
+                <div>
+                    <h3 class="sheet-title" id="addFacultyTitle">+ Add Missing Faculty</h3>
+                    <p class="sheet-sub" id="addFacultySubtitle">Start with the basics. The community can fill the rest.</p>
+                </div>
+                <button class="close-btn" id="addFacultyCloseBtn">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+            <div class="sheet-body">
+                <label class="form-label">Faculty Initial <span class="optional">(required)</span></label>
+                <input type="text" id="addFacultyInitial" class="form-input" placeholder="e.g., FBAW" autocomplete="off" spellcheck="false" />
+
+                <label class="form-label">Course Code <span class="optional">(required)</span></label>
+                <input type="text" id="addFacultyCourse" class="form-input" placeholder="e.g., CSE220" autocomplete="off" spellcheck="false" />
+
+                <label class="form-label">Faculty Full Name <span class="optional">(optional)</span></label>
+                <input type="text" id="addFacultyName" class="form-input" placeholder="If you know it.." autocomplete="off" />
+
+                <label class="form-label">Department <span class="optional">(optional)</span></label>
+                <div class="chip-grid dept-chip-grid" id="departmentChipGrid">
+                    <button type="button" class="choice-chip" data-dept="CSE">CSE</button>
+                    <button type="button" class="choice-chip" data-dept="EEE">EEE</button>
+                    <button type="button" class="choice-chip" data-dept="BBA">BBA</button>
+                    <button type="button" class="choice-chip" data-dept="LLB">LLB</button>
+                    <button type="button" class="choice-chip" data-dept="MNS">MNS</button>
+                    <button type="button" class="choice-chip" data-dept="Microbiology">Microbiology</button>
+                    <button type="button" class="choice-chip" data-dept="Other">Other</button>
+                </div>
+
+                <div class="mini-warning" id="addFacultyHint">Tip: keep the initial clean and capital letter. Use “ABC”, not “Abc sir CSE220”.</div>
+                <button class="pill-btn pill-btn--white full-w" id="createFacultyBtn">Create Page</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── COMMUNITY REVIEW SHEET ── -->
+    <div class="backdrop" id="communityReviewBackdrop">
+        <div class="bottom-sheet bottom-sheet--tall" onclick="event.stopPropagation()">
+            <div class="sheet-knob"></div>
+            <div class="sheet-head">
+                <div>
+                    <h3 class="sheet-title" id="communityReviewTitle">Add Community Review</h3>
+                    <p class="sheet-sub">Tap what matches. Add context only if needed.</p>
+                </div>
+                <button class="close-btn" id="communityReviewCloseBtn">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+            <div class="sheet-body">
+                <label class="form-label">Course Code <span class="optional">(required)</span></label>
+                <input type="text" id="communityReviewCourseCode" class="form-input" placeholder="e.g., CSE220" autocomplete="off" spellcheck="false" />
+
+                <div class="review-scale-box">
+                    <label class="form-label">Teaching Quality</label>
+                    <div class="slider-row">
+                        <input type="range" id="communityTeachingSlider" class="slider" min="1" max="10" step="0.5" value="5"/>
+                        <span class="slider-val" id="communityTeachingValue">5.0</span>
+                    </div>
+
+                    <label class="form-label">Marking Fairness</label>
+                    <div class="slider-row">
+                        <input type="range" id="communityMarkingSlider" class="slider" min="1" max="10" step="0.5" value="5"/>
+                        <span class="slider-val" id="communityMarkingValue">5.0</span>
+                    </div>
+
+                    <label class="form-label">Behavior & Attitude</label>
+                    <div class="slider-row">
+                        <input type="range" id="communityBehaviorSlider" class="slider" min="1" max="10" step="0.5" value="5"/>
+                        <span class="slider-val" id="communityBehaviorValue">5.0</span>
+                    </div>
+                </div>
+
+                <div class="chip-help">Pick as many as you want. Same category, multiple feelings — all okay.</div>
+                <div id="communityChipGroups" class="community-chip-groups"></div>
+
+                <label class="form-label">Say the thing you wish someone told you before advising. <span class="optional">(optional · 500 chars)</span></label>
+                <textarea id="communityPersonalNote" class="form-textarea" placeholder="Optional — add your own context here." maxlength="500"></textarea>
+                <div class="char-count" id="communityNoteCounter">0 / 500</div>
+
+                <button class="pill-btn pill-btn--white full-w" id="submitCommunityReviewBtn">Submit Review</button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- ── PRIVATE PROFILE SHEET ── -->
+    <div class="backdrop" id="profileBackdrop">
+        <div class="bottom-sheet bottom-sheet--tall" onclick="event.stopPropagation()">
+            <div class="sheet-knob"></div>
+            <div class="sheet-head">
+                <div>
+                    <h3 class="sheet-title">Profile</h3>
+                    <p class="sheet-sub">Your private contribution space. Reviews stay anonymous.</p>
+                </div>
+                <button class="close-btn" id="profileCloseBtn">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+            <div class="sheet-body" id="profileSheetBody">
+                <div class="profile-loading">Loading your profile...</div>
+            </div>
+        </div>
+    </div>
+
+    <script defer src="script.js"></script>
 </body>
 </html>
