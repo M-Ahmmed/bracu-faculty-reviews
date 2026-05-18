@@ -4502,7 +4502,7 @@ async function handleCommunityReviewReaction(reviewId, reactionType) {
         } else if (reactionType === 'not_useful') {
             showToast('Feedback saved.', 'success');
         } else {
-            showToast('Report recorded. I can review it from Supabase.', 'success');
+            showToast('Report recorded.', 'success');
         }
 
         refreshProfileChipOnly();
