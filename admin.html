@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BRACU Faculty Admin</title>
+    <link rel="stylesheet" href="admin.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="admin-bg"></div>
+
+    <div class="admin-lock" id="adminLock">
+        <div class="lock-card">
+            <div class="lock-mark">⌘</div>
+            <h1>Control Room</h1>
+            <p>Private owner dashboard. Keep this page unlisted.</p>
+            <input type="password" id="adminPassInput" class="lock-input" placeholder="Passcode" autocomplete="off" />
+            <button id="adminPassBtn" class="primary-btn">Enter</button>
+            <div class="lock-error" id="adminPassError"></div>
+        </div>
+    </div>
+
+    <main class="admin-shell" id="adminShell">
+        <header class="topbar">
+            <div>
+                <div class="eyebrow">BRACU Faculty Reviews</div>
+                <h1>Control Room</h1>
+                <p>Users, Aura, searches, reviews, pages, feedback, reports, notification pulse, and raw activity — without unstable page jumps.</p>
+            </div>
+            <div class="topbar-actions">
+                <button class="ghost-btn" id="exportBtn">Export JSON</button>
+                <button class="ghost-btn" id="refreshBtn">Refresh</button>
+            </div>
+        </header>
+
+        <section class="command-card">
+            <div class="segment">
+                <button class="segment-btn active" id="dailyModeBtn">Daily</button>
+                <button class="segment-btn" id="weeklyModeBtn">Weekly</button>
+                <button class="segment-btn" id="allModeBtn">All time</button>
+            </div>
+
+            <div class="control-grid">
+                <label>
+                    <span id="dateLabel">Select date</span>
+                    <input type="date" id="dateInput" />
+                </label>
+                <label>
+                    <span>Find user</span>
+                    <input type="text" id="userFilterInput" placeholder="username, email, handle..." />
+                </label>
+                <label>
+                    <span>Focus</span>
+                    <select id="quickFilterSelect">
+                        <option value="all" selected>All users</option>
+                        <option value="reviewers">Reviewers</option>
+                        <option value="page_adders">Page adders</option>
+                        <option value="aura_earned">Earned Aura</option>
+                        <option value="failed_searchers">Failed searchers</option>
+                        <option value="reported">Reported reviews</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Sort</span>
+                    <select id="sortSelect">
+                        <option value="recent_visit" selected>Recent visit</option>
+                        <option value="recent_action">Recent action</option>
+                        <option value="aura">Most Aura</option>
+                        <option value="aura_range">Aura earned</option>
+                        <option value="reviews">Reviews</option>
+                        <option value="pages">Pages added</option>
+                        <option value="helpful">Agrees received</option>
+                        <option value="searches">Searches</option>
+                        <option value="failed">Failed searches</option>
+                        <option value="newest_signup">Newest signup</option>
+                    </select>
+                </label>
+            </div>
+        </section>
+
+        <section class="stats-grid">
+            <button class="stat-card" data-jump="users"><span>Users</span><strong id="statUsers">0</strong></button>
+            <button class="stat-card" data-jump="users"><span>Visits</span><strong id="statVisits">0</strong></button>
+            <button class="stat-card" data-jump="demand"><span>Searches</span><strong id="statSearches">0</strong></button>
+            <button class="stat-card danger" data-jump="demand"><span>Failed</span><strong id="statFailedSearches">0</strong></button>
+            <button class="stat-card" data-jump="reviews"><span>Reviews</span><strong id="statReviews">0</strong></button>
+            <button class="stat-card" data-jump="reviews"><span>Pages</span><strong id="statPages">0</strong></button>
+            <button class="stat-card aura" data-jump="users"><span>Aura earned</span><strong id="statAura">0</strong></button>
+            <button class="stat-card report" data-jump="reports"><span>Reports</span><strong id="statReports">0</strong></button>
+        </section>
+
+        <section class="pulse-grid" id="pulseGrid">
+            <div class="pulse-panel priority" id="feedbackPanel">
+                <div class="panel-head compact">
+                    <div>
+                        <h2>Feedback Inbox</h2>
+                        <p>Bug reports, wrong info, missing faculty, ideas.</p>
+                    </div>
+                    <span class="count-pill" id="feedbackCount">0</span>
+                </div>
+                <div class="compact-list" id="feedbackList"></div>
+            </div>
+
+            <div class="pulse-panel" id="reportPanel">
+                <div class="panel-head compact">
+                    <div>
+                        <h2>Review Reports</h2>
+                        <p>Reviews students marked for inspection.</p>
+                    </div>
+                    <span class="count-pill red" id="reviewReportCount">0</span>
+                </div>
+                <div class="compact-list" id="reviewReportList"></div>
+            </div>
+
+            <div class="pulse-panel" id="notificationPanel">
+                <div class="panel-head compact">
+                    <div>
+                        <h2>Notification Pulse</h2>
+                        <p>Watches, review requests, and useful in-app nudges.</p>
+                    </div>
+                    <span class="count-pill purple" id="notificationCount">0</span>
+                </div>
+                <div class="compact-list" id="notificationList"></div>
+            </div>
+
+            <div class="pulse-panel" id="demandPanel">
+                <div class="panel-head compact">
+                    <div>
+                        <h2>Demand Gaps</h2>
+                        <p>Faculties students searched but could not find.</p>
+                    </div>
+                    <span class="count-pill" id="demandCount">0</span>
+                </div>
+                <div class="compact-list" id="topFailedSearches"></div>
+            </div>
+        </section>
+
+        <section class="activity-grid">
+            <div class="panel small-feed" id="reviewsPanel">
+                <div class="panel-head compact">
+                    <div>
+                        <h2>Latest Reviews</h2>
+                        <p>Newest student/community review activity.</p>
+                    </div>
+                    <span class="count-pill" id="recentReviewCount">0</span>
+                </div>
+                <div class="compact-list" id="recentReviews"></div>
+            </div>
+
+            <div class="panel small-feed" id="pagesPanel">
+                <div class="panel-head compact">
+                    <div>
+                        <h2>Latest Pages</h2>
+                        <p>New community faculty pages created.</p>
+                    </div>
+                    <span class="count-pill" id="recentPageCount">0</span>
+                </div>
+                <div class="compact-list" id="recentPages"></div>
+            </div>
+        </section>
+
+        <section class="main-grid" id="usersSection">
+            <aside class="panel user-panel">
+                <div class="panel-head sticky-head">
+                    <div>
+                        <h2 id="listTitle">Users</h2>
+                        <p id="listSubtitle">Select a user to inspect details.</p>
+                    </div>
+                    <span class="count-pill" id="rowCount">0 rows</span>
+                </div>
+                <div class="user-list" id="userList"></div>
+            </aside>
+
+            <section class="panel detail-panel">
+                <div class="empty-detail" id="emptyDetail">
+                    <div class="empty-icon">⌕</div>
+                    <h2>Select a user</h2>
+                    <p>Choose a row to inspect profile, Aura, searches, reviews, pages, reactions, notifications, and timeline.</p>
+                </div>
+
+                <div class="detail-content" id="detailContent">
+                    <div class="detail-head">
+                        <div>
+                            <div class="eyebrow">Selected user</div>
+                            <h2 id="detailUsername">—</h2>
+                            <p id="detailEmail">—</p>
+                            <div class="detail-handle" id="detailHandle">—</div>
+                        </div>
+                        <div class="detail-side">
+                            <span class="status-pill" id="detailRange">—</span>
+                            <span class="status-pill aura-pill" id="detailAuraRank">—</span>
+                        </div>
+                    </div>
+
+                    <div class="mini-stats">
+                        <div><span>Visits</span><strong id="detailRangeVisits">0</strong></div>
+                        <div><span>Lifetime</span><strong id="detailLifetimeVisits">0</strong></div>
+                        <div><span>Aura</span><strong id="detailAura">0</strong></div>
+                        <div><span>Reviews</span><strong id="detailReviewsCount">0</strong></div>
+                        <div><span>Pages</span><strong id="detailPagesCount">0</strong></div>
+                        <div><span>Agrees</span><strong id="detailAgrees">0</strong></div>
+                        <div><span>Failed</span><strong id="detailFailed">0</strong></div>
+                        <div><span>Reports</span><strong id="detailReports">0</strong></div>
+                    </div>
+
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="overview">Overview</button>
+                        <button class="tab-btn" data-tab="searches">Searches</button>
+                        <button class="tab-btn" data-tab="reviews">Reviews</button>
+                        <button class="tab-btn" data-tab="pages">Pages</button>
+                        <button class="tab-btn" data-tab="aura">Aura</button>
+                        <button class="tab-btn" data-tab="reactions">Reactions</button>
+                        <button class="tab-btn" data-tab="notifications">Notifications</button>
+                        <button class="tab-btn" data-tab="votes">Votes</button>
+                        <button class="tab-btn" data-tab="timeline">Timeline</button>
+                        <button class="tab-btn" data-tab="raw">Raw</button>
+                    </div>
+
+                    <div class="tab-body active" id="tab-overview"></div>
+                    <div class="tab-body" id="tab-searches"></div>
+                    <div class="tab-body" id="tab-reviews"></div>
+                    <div class="tab-body" id="tab-pages"></div>
+                    <div class="tab-body" id="tab-aura"></div>
+                    <div class="tab-body" id="tab-reactions"></div>
+                    <div class="tab-body" id="tab-notifications"></div>
+                    <div class="tab-body" id="tab-votes"></div>
+                    <div class="tab-body" id="tab-timeline"></div>
+                    <div class="tab-body" id="tab-raw"></div>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

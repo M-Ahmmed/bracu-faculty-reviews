@@ -3,15 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Find honest BRACU faculty reviews. 1,500+ student reviews analyzed and summarized.">
+    <meta name="description" content="Find BRACU faculty reviews, community verdicts, and student-written experiences before advising.">
     <meta property="og:title" content="BRACU Faculty Reviews">
-    <meta property="og:description" content="Find your faculty before registration. Real data from real students.">
+    <meta property="og:description" content="Find your faculty before advising. Archive summaries plus community reviews from BRACU students.">
     <meta name="theme-color" content="#000000">
     <title>BRACU Faculty Reviews</title>
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="shortcut icon" href="favicon.ico">
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preload" as="image" href="bracu-campus-bg.webp" type="image/webp" media="(min-width: 481px)" fetchpriority="low">
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('bracu_theme');
+                document.documentElement.setAttribute('data-theme', savedTheme === 'light' ? 'light' : 'dark');
+            } catch (_) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="styles.css">
     <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
@@ -71,6 +81,14 @@
         <div class="card card-search" id="mainLandingCard">
             <div class="search-body">
                 <div class="hero-topline">
+                    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to light mode" title="Switch theme">
+                        <span class="theme-toggle-icon theme-toggle-icon--sun" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M12 4V2M12 22v-2M4 12H2m20 0h-2M5.64 5.64 4.22 4.22m15.56 15.56-1.42-1.42M18.36 5.64l1.42-1.42M4.22 19.78l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.8"/></svg>
+                        </span>
+                        <span class="theme-toggle-icon theme-toggle-icon--moon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M20.2 14.1A7.7 7.7 0 0 1 9.9 3.8 8.3 8.3 0 1 0 20.2 14.1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                        </span>
+                    </button>
                     <button class="profile-chip profile-chip--icon" id="profileChip" type="button" aria-label="Open your profile" title="Your profile" style="display:none;">
                         <span class="profile-chip-avatar" aria-hidden="true">
                             <img
@@ -92,13 +110,6 @@
                     No chaos. No Facebook scrolling.<br>Just the actual data you need.
                 </p>
 
-                <div class="meta-row">
-                    <span>1,500+ reviews</span>
-                    <span class="sep">·</span>
-                    <span>Updated March 2026</span>
-                    <span class="sep">·</span>
-                    <span>AI-distilled</span>
-                </div>
 
                 <form class="search-form" id="searchForm">
                     <div class="search-pill-wrap" id="searchWrap">
@@ -127,9 +138,9 @@
             </div>
 
             <div class="card-foot">
-                <span class="foot-copy">Built by Mueen</span>
+                <button class="foot-copy foot-copy-btn" type="button" onclick="openCreatorCard()">Built by Mueen</button>
                 <div class="foot-links">
-                    <a href="https://www.facebook.com/mueen.ahmmed.7" target="_blank" class="foot-link">Feedback</a>
+                    <button class="foot-link foot-btn" type="button" onclick="openFeedbackCard()">Feedback</button>
                     <span class="sep">·</span>
                     <button class="foot-link foot-btn" onclick="openSupportCard()">☕ Coffee</button>
                 </div>
@@ -145,6 +156,68 @@
 
     <!-- Toast -->
     <div class="toast" id="toast"></div>
+
+    <!-- ── CREATOR SHEET ── -->
+    <div class="backdrop" id="creatorBackdrop" onclick="closeCreatorCard()">
+        <div class="bottom-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-knob"></div>
+            <div class="sheet-head">
+                <div>
+                    <h3 class="sheet-title">Built by Mueen</h3>
+                    <p class="sheet-sub">A small thing from me — for BRACU students.</p>
+                </div>
+                <button class="close-btn" id="creatorCloseBtn" type="button">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+            <div class="sheet-body">
+                <div class="creator-links">
+                    <a class="creator-link" href="https://github.com/M-Ahmmed" target="_blank" rel="noopener noreferrer">GitHub</a>
+                    <a class="creator-link" href="https://www.linkedin.com/in/mueen-ahmmed-b337b8231/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                    <a class="creator-link" href="https://www.instagram.com/mueen.ahmmed/" target="_blank" rel="noopener noreferrer">Instagram</a>
+                    <a class="creator-link" href="https://www.facebook.com/mueen.ahmmed.7/" target="_blank" rel="noopener noreferrer">Facebook</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── FEEDBACK SHEET ── -->
+    <div class="backdrop" id="feedbackBackdrop" onclick="closeFeedbackCard()">
+        <div class="bottom-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-knob"></div>
+            <div class="sheet-head">
+                <div>
+                    <h3 class="sheet-title">Feedback</h3>
+                    <p class="sheet-sub">Bug, wrong info, missing data, idea — drop it here.</p>
+                </div>
+                <button class="close-btn" id="feedbackCloseBtn" type="button">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+            <div class="sheet-body">
+                <div class="feedback-type-row" id="feedbackTypeGrid">
+                    <button type="button" class="choice-chip active" data-feedback-type="bug">Bug</button>
+                    <button type="button" class="choice-chip" data-feedback-type="wrong_info">Wrong info</button>
+                    <button type="button" class="choice-chip" data-feedback-type="missing_faculty">Missing faculty</button>
+                    <button type="button" class="choice-chip" data-feedback-type="idea">Idea</button>
+                    <button type="button" class="choice-chip" data-feedback-type="other">Other</button>
+                </div>
+
+                <label class="form-label">Message <span class="optional">(required)</span></label>
+                <textarea id="feedbackMessage" class="form-textarea" placeholder="Write the issue or idea here..." maxlength="700"></textarea>
+                <div class="char-count" id="feedbackCounter">0 / 700</div>
+
+                <button class="pill-btn pill-btn--white full-w" id="submitFeedbackBtn" type="button">Send Feedback</button>
+
+                <div class="feedback-fallback">
+                    <span>Prefer email?</span>
+                    <button class="foot-link foot-btn" type="button" id="copyFeedbackEmailBtn">Copy email</button>
+                    <span class="sep">·</span>
+                    <a class="foot-link" href="mailto:mueenahmmed1@gmail.com?subject=BRACU%20Faculty%20Reviews%20Feedback">Open mail</a>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- ── COFFEE SHEET ── -->
     <div class="backdrop" id="supportBackdrop" onclick="closeSupportCard()">
@@ -263,8 +336,9 @@
                 <label class="form-label">Faculty Initial <span class="optional">(required)</span></label>
                 <input type="text" id="addFacultyInitial" class="form-input" placeholder="e.g., FBAW" autocomplete="off" spellcheck="false" />
 
-                <label class="form-label">Course Code <span class="optional">(required)</span></label>
-                <input type="text" id="addFacultyCourse" class="form-input" placeholder="e.g., CSE220" autocomplete="off" spellcheck="false" />
+                <label class="form-label">Course Code(s) <span class="optional">(required)</span></label>
+                <input type="text" id="addFacultyCourse" class="form-input" placeholder="e.g., CSE220, CSE221" autocomplete="off" spellcheck="false" />
+                <div class="course-preview" id="addFacultyCoursePreview"></div>
 
                 <label class="form-label">Faculty Full Name <span class="optional">(optional)</span></label>
                 <input type="text" id="addFacultyName" class="form-input" placeholder="If you know it.." autocomplete="off" />
