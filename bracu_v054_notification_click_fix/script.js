@@ -397,9 +397,33 @@ async function logSearch(query, type, matched) {
         matched
     });
 
+    // Remember missing faculty searches quietly. This powers useful future notifications:
+    // “that faculty you searched is now listed / has a first review / reached verdict.”
+    if (!matched && String(type || '').toLowerCase() === 'faculty') {
+        recordMissingFacultyWatch(query, type);
+    }
+
     // Aura for exploration is silent: +5 once/day after a meaningful search,
     // then +1 per unique search, max +5/day. SQL enforces the anti-spam rules.
     awardAuraForSearch(query, type);
+}
+
+async function recordMissingFacultyWatch(query, type) {
+    if (!currentUser || !currentUser.username || !currentUser.full_email) return;
+
+    try {
+        const { error } = await _supabase.rpc('record_missing_faculty_watch', {
+            p_username: currentUser.username,
+            p_full_email: currentUser.full_email,
+            p_query: String(query || ''),
+            p_query_type: String(type || 'faculty')
+        });
+
+        if (error) throw error;
+    } catch (err) {
+        // Never block search if the notification patch is not installed yet.
+        console.warn('recordMissingFacultyWatch:', err.message || err);
+    }
 }
 
 async function awardAuraForSearch(query, type) {
@@ -427,10 +451,23 @@ const searchButton      = document.getElementById('searchButton');
 const courseRatingArea  = document.getElementById('courseRatingArea');
 const facultyReviewArea = document.getElementById('facultyReviewArea');
 const toastEl           = document.getElementById('toast');
+const themeToggle       = document.getElementById('themeToggle');
+const themeMeta         = document.querySelector('meta[name="theme-color"]');
 
 const supportBackdrop   = document.getElementById('supportBackdrop');
 const supportCloseBtn   = document.getElementById('supportCloseBtn');
 const copyNumberBtn     = document.getElementById('copyNumberBtn');
+
+const creatorBackdrop   = document.getElementById('creatorBackdrop');
+const creatorCloseBtn   = document.getElementById('creatorCloseBtn');
+
+const feedbackBackdrop  = document.getElementById('feedbackBackdrop');
+const feedbackCloseBtn  = document.getElementById('feedbackCloseBtn');
+const feedbackTypeGrid  = document.getElementById('feedbackTypeGrid');
+const feedbackMessage   = document.getElementById('feedbackMessage');
+const feedbackCounter   = document.getElementById('feedbackCounter');
+const submitFeedbackBtn = document.getElementById('submitFeedbackBtn');
+const copyFeedbackEmailBtn = document.getElementById('copyFeedbackEmailBtn');
 
 const reviewBackdrop    = document.getElementById('reviewBackdrop');
 const emailLoginStep    = document.getElementById('emailLoginStep');
@@ -458,6 +495,37 @@ let currentCourseCode       = null;
 let currentFacultyForReview = null;
 let currentReviewOffset     = 0;
 let currentDisplayedFaculty = null;
+
+// ── THEME TOGGLE ──
+function getSavedTheme() {
+    try {
+        return localStorage.getItem('bracu_theme') === 'light' ? 'light' : 'dark';
+    } catch (_) {
+        return 'dark';
+    }
+}
+
+function applyTheme(theme) {
+    const safeTheme = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', safeTheme);
+    if (themeMeta) themeMeta.setAttribute('content', safeTheme === 'light' ? '#f6f4ef' : '#000000');
+    if (themeToggle) {
+        themeToggle.setAttribute('aria-label', safeTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
+        themeToggle.setAttribute('title', safeTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
+        themeToggle.dataset.theme = safeTheme;
+    }
+}
+
+function initThemeToggle() {
+    applyTheme(getSavedTheme());
+    themeToggle?.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+        const next = current === 'light' ? 'dark' : 'light';
+        try { localStorage.setItem('bracu_theme', next); } catch (_) {}
+        applyTheme(next);
+    });
+}
+
 
 // ── 7. TYPEWRITER ──
 const typewriterEl = document.getElementById('typewriterText');
@@ -577,6 +645,7 @@ async function loadFacultyData() {
 
 // ── 10. INIT ──
 (async function init() {
+    initThemeToggle();
     await handleAuth();
     loadFacultyData();
 })();
@@ -798,7 +867,7 @@ async function handleCourseSearch(code) {
                     <div class="empty-state">
                         <span class="empty-icon">🔍</span>
                         <p class="empty-title">No faculty found for ${escHtml(code)}</p>
-                        <p class="empty-desc">This course may not be in our database yet. Drop the name in the Facebook comments or hit Feedback.</p>
+                        <p class="empty-desc">This course may not be in the archive yet. Send a quick note through Feedback if something looks missing.</p>
                     </div>
                 </div>
             </div>
@@ -918,7 +987,7 @@ async function handleFacultySearch(input, keepLeaderboard = false) {
                         <div class="empty-state">
                             <span class="empty-icon">💔🥀</span>
                             <p class="empty-title">"${escHtml(input)}" isn't listed yet.</p>
-                            <p class="empty-desc">Please send me the faculty name through the Feedback button. I’m adding entries one by one 😭 so it may take a little time — stay tuned.</p>
+                            <p class="empty-desc">Could not find this one yet. Use Feedback if something looks wrong, or add the missing faculty page if you know the initial.</p>
                         </div>
                     </div>
                 </div>
@@ -1283,7 +1352,7 @@ function buildReviewCard(r) {
     const accent = getReviewAccentColor(avg);
 
     return `
-        <div class="review-card" style="--review-accent:${accent}">
+        <div class="review-card" id="legacy-review-${r.id}" data-review-id="${escHtml(r.id)}" style="--review-accent:${accent}">
             <div class="review-meta">
                 <span>Anonymous</span>
                 ${r.course_code ? `<span class="review-course-chip">${escHtml(r.course_code)}</span>` : ''}
@@ -1649,27 +1718,130 @@ async function handleShareLink(facultyId) {
 window.handleShareLink = handleShareLink;
 
 // ── 20. URL PARAMS ──
-function checkUrlParams() {
-    const id = new URLSearchParams(location.search).get('reviewFaculty');
+// v0.4.9 note: old reviewFaculty-only handler removed.
+// The unified deep-link handler below supports archive pages, community pages, exact reviews, and searches.
 
-    if (!id) return;
-
-    const checkInterval = setInterval(() => {
-        if (!allFaculty.length) return;
-
-        clearInterval(checkInterval);
-
-        const f = allFaculty.find(x => x.id === parseInt(id));
-
-        if (f) {
-            const name = f.faculty_reviews?.split('|')[0]?.trim() || 'Faculty';
-
-            setTimeout(() => openReviewModal(f.id, name), 600);
-        }
-    }, 100);
-
-    setTimeout(() => clearInterval(checkInterval), 6000);
+// ── 20.5 CREATOR + FEEDBACK SHEETS ──
+function openCreatorCard() {
+    openSheet(creatorBackdrop);
 }
+
+function closeCreatorCard() {
+    closeSheet(creatorBackdrop);
+}
+
+creatorCloseBtn?.addEventListener('click', closeCreatorCard);
+creatorBackdrop?.addEventListener('click', e => {
+    if (e.target === creatorBackdrop) closeCreatorCard();
+});
+
+window.openCreatorCard = openCreatorCard;
+window.closeCreatorCard = closeCreatorCard;
+
+var selectedFeedbackType = 'bug';
+
+function openFeedbackCard() {
+    if (feedbackMessage) feedbackMessage.value = '';
+    if (feedbackCounter) feedbackCounter.textContent = '0 / 700';
+    selectedFeedbackType = 'bug';
+    feedbackTypeGrid?.querySelectorAll('.choice-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.feedbackType === selectedFeedbackType);
+    });
+    openSheet(feedbackBackdrop);
+    setTimeout(() => feedbackMessage?.focus(), 120);
+}
+
+function closeFeedbackCard() {
+    closeSheet(feedbackBackdrop);
+}
+
+feedbackCloseBtn?.addEventListener('click', closeFeedbackCard);
+feedbackBackdrop?.addEventListener('click', e => {
+    if (e.target === feedbackBackdrop) closeFeedbackCard();
+});
+
+feedbackTypeGrid?.addEventListener('click', e => {
+    const btn = e.target.closest('.choice-chip');
+    if (!btn) return;
+    selectedFeedbackType = btn.dataset.feedbackType || 'other';
+    feedbackTypeGrid.querySelectorAll('.choice-chip').forEach(x => x.classList.remove('active'));
+    btn.classList.add('active');
+});
+
+feedbackMessage?.addEventListener('input', e => {
+    const len = e.target.value.length;
+    if (feedbackCounter) {
+        feedbackCounter.textContent = `${len} / 700`;
+        feedbackCounter.className = 'char-count' + (len >= 4 ? ' ok' : len ? ' err' : '');
+    }
+});
+
+copyFeedbackEmailBtn?.addEventListener('click', async () => {
+    try {
+        await navigator.clipboard.writeText('mueenahmmed1@gmail.com');
+        showToast('Email copied.', 'success');
+    } catch {
+        showToast('Copy failed.', 'error');
+    }
+});
+
+submitFeedbackBtn?.addEventListener('click', async () => {
+    const message = String(feedbackMessage?.value || '').trim();
+    const { email, username } = getCurrentEmailAndUsername ? getCurrentEmailAndUsername() : {
+        email: currentUser?.full_email || localStorage.getItem('bracu_user_email') || null,
+        username: currentUser?.username || null
+    };
+
+    if (message.length < 4) {
+        showToast('Write a little more first.', 'error');
+        return;
+    }
+
+    if (message.length > 700) {
+        showToast('Feedback is too long.', 'error');
+        return;
+    }
+
+    submitFeedbackBtn.disabled = true;
+    submitFeedbackBtn.textContent = 'Sending...';
+
+    try {
+        const payload = {
+            p_feedback_type: selectedFeedbackType || 'other',
+            p_message: message,
+            p_username: username || null,
+            p_full_email: email || null,
+            p_page_url: location.href,
+            p_metadata: {
+                user_agent: navigator.userAgent,
+                path: location.pathname,
+                theme: document.documentElement.getAttribute('data-theme') || 'dark'
+            }
+        };
+
+        const { error } = await _supabase.rpc('submit_site_feedback', payload);
+        if (error) throw error;
+
+        await logActivity('feedback_submit', {
+            target_type: 'site',
+            target_id: selectedFeedbackType,
+            event_label: selectedFeedbackType,
+            metadata: { message_length: message.length }
+        });
+
+        closeFeedbackCard();
+        showToast('Feedback sent. Thank you.', 'success');
+    } catch (err) {
+        console.error('submitFeedback error:', err);
+        showToast(err.message || 'Could not send feedback.', 'error');
+    } finally {
+        submitFeedbackBtn.disabled = false;
+        submitFeedbackBtn.textContent = 'Send Feedback';
+    }
+});
+
+window.openFeedbackCard = openFeedbackCard;
+window.closeFeedbackCard = closeFeedbackCard;
 
 // ── 21. COFFEE SUPPORT ──
 function openSupportCard() {
@@ -1714,58 +1886,58 @@ function toggleAbout() {
         area.innerHTML = `
             <div class="card slide-up">
                 <div class="card-head">
-                    <h2 style="font-size:18px;font-weight:800;letter-spacing:-0.02em;color:var(--t1)">Disclaimer & Data Notice</h2>
+                    <h2 style="font-size:18px;font-weight:850;letter-spacing:-0.03em;color:var(--t1)">About & Data Notice</h2>
                 </div>
 
                 <div class="card-body">
                     <div class="disclaimer-section">
-                        <div class="disclaimer-heading">What is this?</div>
-                        <p class="disclaimer-text">An independent tool to help BRACU students find patterns in thousands of faculty reviews from Facebook groups — saving you hours of scrolling.</p>
+                        <div class="disclaimer-heading">What this is</div>
+                        <p class="disclaimer-text">A student-built BRACU advising helper. It combines old archive summaries with new community reviews so students can decide faster before advising.</p>
                     </div>
 
                     <div class="disclaimer-section">
-                        <div class="disclaimer-heading">Methodology</div>
+                        <div class="disclaimer-heading">How it works</div>
                         <div class="insights-list">
                             <div class="insight-item">
                                 <span class="insight-num">01</span>
-                                <span class="insight-text">12–20+ review posts tracked per faculty member</span>
+                                <span class="insight-text">Archive pages use older student discussions summarized into readable patterns.</span>
                             </div>
 
                             <div class="insight-item">
                                 <span class="insight-num">02</span>
-                                <span class="insight-text">Hundreds of student comments analyzed per faculty</span>
+                                <span class="insight-text">Community pages grow from BRACU student reviews. Enough reviews unlock a Community Verdict.</span>
                             </div>
 
                             <div class="insight-item">
                                 <span class="insight-num">03</span>
-                                <span class="insight-text">AI used to identify consistent patterns, not generate opinions</span>
+                                <span class="insight-text">Aura is a private contribution trail. It rewards useful activity, not official academic evaluation.</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="disclaimer-section">
-                        <div class="disclaimer-heading">Important</div>
+                        <div class="disclaimer-heading">Privacy & trust</div>
                         <div class="insights-list">
                             <div class="insight-item">
                                 <span class="insight-num">→</span>
-                                <span class="insight-text">Not affiliated with BRACU or any department</span>
+                                <span class="insight-text">Not affiliated with BRACU, any department, or any faculty member.</span>
                             </div>
 
                             <div class="insight-item">
                                 <span class="insight-num">→</span>
-                                <span class="insight-text">These are peer experiences, not official evaluations</span>
+                                <span class="insight-text">Reviews are peer experiences, not official evaluations or guaranteed outcomes.</span>
                             </div>
 
                             <div class="insight-item">
                                 <span class="insight-num">→</span>
-                                <span class="insight-text">Contact via Feedback to report inaccuracies</span>
+                                <span class="insight-text">Public reviews stay anonymous. Your Gmail is only used privately for profile and anti-spam logic.</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="disclaimer-section">
                         <div class="disclaimer-heading">Status</div>
-                        <p class="disclaimer-text">Currently covering CSE Department. Adding more faculty and departments in weekly waves — each entry requires deep research and manual verification.</p>
+                        <p class="disclaimer-text">The archive is still growing. Missing faculty pages can now be added by students, and the community can fill the rest over time.</p>
                     </div>
                 </div>
 
@@ -1865,6 +2037,12 @@ function escHtml(str) {
     d.textContent = String(str);
 
     return d.innerHTML;
+}
+
+function escAttr(value) {
+    return escHtml(String(value == null ? '' : value))
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;');
 }
 
 /* ════════════════════════════════════════════════
@@ -2188,6 +2366,7 @@ var addFacultyTitle = document.getElementById('addFacultyTitle');
 var addFacultySubtitle = document.getElementById('addFacultySubtitle');
 var addFacultyInitial = document.getElementById('addFacultyInitial');
 var addFacultyCourse = document.getElementById('addFacultyCourse');
+var addFacultyCoursePreview = document.getElementById('addFacultyCoursePreview');
 var addFacultyName = document.getElementById('addFacultyName');
 var createFacultyBtn = document.getElementById('createFacultyBtn');
 var departmentChipGrid = document.getElementById('departmentChipGrid');
@@ -2291,6 +2470,50 @@ function normalizeCourseCode(value) {
 
 function isValidCourseCode(code) {
     return /^[A-Z]{2,5}\d{2,4}$/.test(normalizeCourseCode(code));
+}
+
+function parseCourseCodes(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return [];
+
+    const seen = new Set();
+    const out = [];
+
+    raw.split(/[,;\n]+/).forEach(part => {
+        const code = normalizeCourseCode(part);
+        if (!code || seen.has(code)) return;
+        seen.add(code);
+        out.push(code);
+    });
+
+    return out;
+}
+
+function validateCourseCodeList(value) {
+    const courses = parseCourseCodes(value);
+    const invalid = courses.filter(code => !isValidCourseCode(code));
+    return { courses, invalid, ok: courses.length > 0 && invalid.length === 0 };
+}
+
+function renderAddFacultyCoursePreview() {
+    if (!addFacultyCoursePreview || !addFacultyCourse) return;
+
+    const raw = String(addFacultyCourse.value || '').trim();
+    if (!raw) {
+        addFacultyCoursePreview.innerHTML = '';
+        return;
+    }
+
+    const { courses, invalid } = validateCourseCodeList(raw);
+
+    if (!courses.length) {
+        addFacultyCoursePreview.innerHTML = '<span class="course-preview-hint">Separate multiple courses with commas.</span>';
+        return;
+    }
+
+    addFacultyCoursePreview.innerHTML = courses.map(code =>
+        `<span class="course-preview-chip ${isValidCourseCode(code) ? '' : 'bad'}">${escHtml(code)}</span>`
+    ).join('') + (invalid.length ? '<span class="course-preview-hint">Check the red course code.</span>' : '');
 }
 
 function facultyDisplayNameFromCommunity(f) {
@@ -2927,7 +3150,7 @@ function buildMixedReviewSection({ legacyReviews = [], legacyTotal = 0, legacyHa
                 <span class="reviews-title">Student Reviews</span>
                 <span class="reviews-title">${total}</span>
             </div>
-            <div id="reviews-container-${id}">${legacyCards}${structuredCards}</div>
+            <div id="reviews-container-${id}">${structuredCards}${legacyCards}</div>
             <div id="load-more-wrap-${id}">${loadMore}</div>
         </div>
     `;
@@ -2944,7 +3167,7 @@ function buildCommunityReviewCard(r) {
     const personal = String(r.personal_note || '').trim();
 
     return `
-        <div class="review-card" style="--review-accent:${accent}">
+        <div class="review-card" id="community-review-${r.id}" data-review-id="${escHtml(r.id)}" style="--review-accent:${accent}">
             <div class="review-meta">
                 <span>Anonymous BRACU Student</span>
                 ${r.course_code ? `<span class="review-course-chip">${escHtml(r.course_code)}</span>` : ''}
@@ -3022,6 +3245,7 @@ function openAddFacultyModal(prefill = '') {
 
     if (addFacultyInitial) addFacultyInitial.value = isValidCourseCode(currentAddFacultyQuery) ? '' : initialGuess;
     if (addFacultyCourse) addFacultyCourse.value = courseGuess;
+    renderAddFacultyCoursePreview();
     if (addFacultyName) addFacultyName.value = '';
 
     departmentChipGrid?.querySelectorAll('.choice-chip').forEach(btn => btn.classList.remove('active'));
@@ -3040,6 +3264,8 @@ addFacultyBackdrop?.addEventListener('click', e => {
     if (e.target === addFacultyBackdrop) closeAddFacultyModal();
 });
 
+addFacultyCourse?.addEventListener('input', renderAddFacultyCoursePreview);
+
 departmentChipGrid?.addEventListener('click', e => {
     const btn = e.target.closest('.choice-chip');
     if (!btn) return;
@@ -3052,7 +3278,9 @@ createFacultyBtn?.addEventListener('click', async () => {
     const email = currentUser?.full_email || localStorage.getItem('bracu_user_email');
     const username = currentUser?.username || (email ? email.split('@')[0] : null);
     const initial = normalizeInitial(addFacultyInitial?.value || '');
-    const course = normalizeCourseCode(addFacultyCourse?.value || '');
+    const courseValidation = validateCourseCodeList(addFacultyCourse?.value || '');
+    const courses = courseValidation.courses;
+    const coursePayload = courses.join(',');
     const name = String(addFacultyName?.value || '').trim() || null;
 
     if (!email || !username) {
@@ -3065,8 +3293,8 @@ createFacultyBtn?.addEventListener('click', async () => {
         return;
     }
 
-    if (!isValidCourseCode(course)) {
-        showToast('Enter a valid course code like CSE220.', 'error');
+    if (!courseValidation.ok) {
+        showToast(courseValidation.invalid.length ? 'Check the course code format.' : 'Enter at least one course code.', 'error');
         return;
     }
 
@@ -3085,7 +3313,7 @@ createFacultyBtn?.addEventListener('click', async () => {
     try {
         const { data, error } = await _supabase.rpc('create_community_faculty_profile', {
             p_faculty_initial: initial,
-            p_course_code: course,
+            p_course_code: coursePayload,
             p_faculty_name: name,
             p_department: selectedDepartment || null,
             p_username: username,
@@ -3109,7 +3337,7 @@ createFacultyBtn?.addEventListener('click', async () => {
                 ? `${demand.unique_students} lost searches now have a page for ${initial}.`
                 : `${initial} is now in the community archive.`,
             xpLines: [
-                { label: 'Page added', points: 15 },
+                { label: 'Page added', points: 25 },
                 ...(demandBonus ? [{ label: 'Demand bonus', points: demandBonus }] : [])
             ],
             footer: 'First review bonus is waiting.'
@@ -3120,7 +3348,7 @@ createFacultyBtn?.addEventListener('click', async () => {
             target_type: 'community_faculty',
             target_id: profile?.id || initial,
             event_label: initial,
-            metadata: { course_code: course, demand_unique_students: demand?.unique_students || 0 }
+            metadata: { course_codes: courses, demand_unique_students: demand?.unique_students || 0 }
         });
 
         if (profile) displayCommunityFaculty(profile, false);
@@ -3513,35 +3741,201 @@ async function handleCommunityShareLink(id) {
 
 window.handleCommunityShareLink = handleCommunityShareLink;
 
-// Override URL params: support old archive links and new community links.
-function checkUrlParams() {
+// Override URL params: support archive links, community links, admin deep links, exact review highlighting, and direct search.
+let urlDeepLinkHandled = false;
+
+function getDeepLinkParams() {
     const params = new URLSearchParams(location.search);
-    const archiveId = params.get('reviewFaculty');
-    const communityId = params.get('communityFaculty');
+    return {
+        archiveId: params.get('reviewFaculty') || params.get('archiveFaculty') || params.get('facultyId'),
+        communityId: params.get('communityFaculty') || params.get('communityPage') || params.get('communityId'),
+        reviewId: params.get('reviewId') || params.get('communityReview') || params.get('communityReviewId'),
+        legacyReviewId: params.get('legacyReviewId') || params.get('studentReviewId'),
+        searchQuery: params.get('search') || params.get('q')
+    };
+}
 
-    if (!archiveId && !communityId) return;
+async function findReviewTargetById(reviewId) {
+    if (!reviewId) return null;
 
-    const checkInterval = setInterval(() => {
+    const id = Number(reviewId);
+    if (!Number.isFinite(id)) return null;
+
+    const sources = ['community_faculty_reviews_public', 'community_faculty_reviews'];
+
+    for (const source of sources) {
+        try {
+            const { data, error } = await _supabase
+                .from(source)
+                .select('id,target_type,community_faculty_id,archive_faculty_id')
+                .eq('id', id)
+                .maybeSingle();
+
+            if (error) throw error;
+            if (data) return data;
+        } catch (err) {
+            console.warn('review target lookup failed in ' + source + ':', err.message || err);
+        }
+    }
+
+    return null;
+}
+
+async function checkUrlParams() {
+    const { archiveId, communityId, reviewId, legacyReviewId, searchQuery } = getDeepLinkParams();
+
+    if (!archiveId && !communityId && !reviewId && !legacyReviewId && !searchQuery) return;
+    if (urlDeepLinkHandled) return;
+
+    const openAndHighlight = async () => {
         if (archiveId) {
-            if (!allFaculty.length) return;
+            if (!allFaculty.length) return false;
             const f = allFaculty.find(x => Number(x.id) === Number(archiveId));
-            if (f) {
-                clearInterval(checkInterval);
-                displayFaculty(f, false);
-            }
+            if (!f) return false;
+            urlDeepLinkHandled = true;
+            await displayFaculty(f, false);
+            highlightDeepLinkedReview(reviewId, legacyReviewId);
+            return true;
         }
 
         if (communityId) {
-            if (!allCommunityFaculty.length) return;
+            if (!allCommunityFaculty.length) return false;
             const f = allCommunityFaculty.find(x => Number(x.id) === Number(communityId));
-            if (f) {
-                clearInterval(checkInterval);
-                displayCommunityFaculty(f, false);
+            if (!f) return false;
+            urlDeepLinkHandled = true;
+            await displayCommunityFaculty(f, false);
+            highlightDeepLinkedReview(reviewId, legacyReviewId);
+            return true;
+        }
+
+        if (reviewId) {
+            const data = await findReviewTargetById(reviewId);
+            if (!data) return false;
+
+            if (data.target_type === 'community' && data.community_faculty_id) {
+                if (!allCommunityFaculty.length) return false;
+                const f = allCommunityFaculty.find(x => Number(x.id) === Number(data.community_faculty_id));
+                if (!f) return false;
+                urlDeepLinkHandled = true;
+                await displayCommunityFaculty(f, false);
+                highlightDeepLinkedReview(reviewId, null);
+                return true;
+            }
+
+            if (data.target_type === 'archive' && data.archive_faculty_id) {
+                if (!allFaculty.length) return false;
+                const f = allFaculty.find(x => Number(x.id) === Number(data.archive_faculty_id));
+                if (!f) return false;
+                urlDeepLinkHandled = true;
+                await displayFaculty(f, false);
+                highlightDeepLinkedReview(reviewId, null);
+                return true;
             }
         }
-    }, 100);
 
-    setTimeout(() => clearInterval(checkInterval), 6000);
+        if (legacyReviewId) {
+            // Legacy student_reviews need the faculty id. Try a lightweight lookup when admin only sends legacyReviewId.
+            try {
+                const { data, error } = await _supabase
+                    .from('student_reviews')
+                    .select('id, faculty_id')
+                    .eq('id', Number(legacyReviewId))
+                    .maybeSingle();
+                if (error) throw error;
+                if (data && data.faculty_id && allFaculty.length) {
+                    const f = allFaculty.find(x => Number(x.id) === Number(data.faculty_id));
+                    if (f) {
+                        urlDeepLinkHandled = true;
+                        await displayFaculty(f, false);
+                        highlightDeepLinkedReview(null, legacyReviewId);
+                        return true;
+                    }
+                }
+            } catch (err) {
+                console.warn('legacy review deep link:', err.message || err);
+            }
+        }
+
+        if (searchQuery) {
+            if (!allFaculty.length || !allCommunityFaculty.length) return false;
+            urlDeepLinkHandled = true;
+            if (searchInput) searchInput.value = searchQuery;
+            await handleFacultySearch(searchQuery, false);
+            return true;
+        }
+
+        return false;
+    };
+
+    const timer = setInterval(async () => {
+        const done = await openAndHighlight();
+        if (done) clearInterval(timer);
+    }, 140);
+
+    setTimeout(() => clearInterval(timer), 9000);
+}
+
+
+function safeCssIdent(value) {
+    const raw = String(value == null ? '' : value);
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(raw);
+    return raw.replace(/[^a-zA-Z0-9_-]/g, ch => '\\' + ch);
+}
+
+function highlightDeepLinkedReview(reviewId, legacyReviewId) {
+    const selectors = [];
+
+    if (reviewId) {
+        const rid = String(reviewId).replace(/"/g, '\\"');
+        selectors.push('#community-review-' + safeCssIdent(reviewId));
+        selectors.push('#legacy-review-' + safeCssIdent(reviewId));
+        selectors.push('[data-community-review-id="' + rid + '"]');
+        selectors.push('[data-review-id="' + rid + '"]');
+    }
+
+    if (legacyReviewId) {
+        const lid = String(legacyReviewId).replace(/"/g, '\\"');
+        selectors.push('#legacy-review-' + safeCssIdent(legacyReviewId));
+        selectors.push('[data-review-id="' + lid + '"]');
+    }
+
+    if (!selectors.length) return;
+
+    setTimeout(() => {
+        let el = null;
+        for (const selector of selectors) {
+            try {
+                el = document.querySelector(selector);
+                if (el) break;
+            } catch (_) {}
+        }
+        if (!el) {
+            console.warn('Deep linked review not visible yet:', { reviewId, legacyReviewId });
+            return;
+        }
+        injectDeepLinkHighlightStyle();
+        el.classList.add('admin-deeplink-highlight');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => el.classList.remove('admin-deeplink-highlight'), 5200);
+    }, 760);
+}
+
+function injectDeepLinkHighlightStyle() {
+    if (document.getElementById('adminDeepLinkHighlightStyle')) return;
+    const style = document.createElement('style');
+    style.id = 'adminDeepLinkHighlightStyle';
+    style.textContent = `
+        .admin-deeplink-highlight {
+            border-color: rgba(100,210,255,.75) !important;
+            box-shadow: 0 0 0 3px rgba(100,210,255,.16), 0 18px 48px rgba(0,0,0,.28) !important;
+            animation: adminDeepPulse 1.15s ease-in-out 2;
+        }
+        @keyframes adminDeepPulse {
+            0%,100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 document.addEventListener('keydown', e => {
@@ -3763,7 +4157,8 @@ function openProfileSheet() {
             markNotificationsReadSoon();
         })
         .catch(err => {
-            body.innerHTML = `<div class="profile-empty-mini">${escHtml(err.message || 'Could not load profile.')}</div>`;
+            console.error('openProfileSheet failed:', err);
+            body.innerHTML = `<div class="profile-empty-mini">Could not load profile right now. Please refresh once. ${escHtml(err.message || '')}</div>`;
         });
 }
 
@@ -3856,6 +4251,16 @@ function openAdvisingXpDetails() {
             </div>
         </div>
     `;
+
+    requestAnimationFrame(() => {
+        const card = area.querySelector('.aura-detail-card');
+        const sheet = card?.closest('.bottom-sheet');
+        if (card && sheet && typeof sheet.scrollTo === 'function') {
+            sheet.scrollTo({ top: Math.max(card.offsetTop - 14, 0), behavior: 'smooth' });
+        } else {
+            card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
 }
 
 function profileBountyItem(b) {
@@ -3973,7 +4378,7 @@ function renderProfileSheet(payload) {
                 </div>
             </div>
             <div class="profile-list" id="profileNotificationList">
-                ${notifications.length ? notifications.map(profileNotificationItem).join('') : `<div class="profile-empty-mini">No notifications yet. Agree reactions and Aura updates will appear here.</div>`}
+                ${notifications.length ? notifications.map(safeProfileNotificationItem).join('') : `<div class="profile-empty-mini">No notifications yet. Agree reactions and Aura updates will appear here.</div>`}
             </div>
         </div>
     `;
@@ -4154,15 +4559,44 @@ function profilePageItem(page) {
     `;
 }
 
+function safeProfileNotificationItem(n) {
+    try {
+        return profileNotificationItem(n);
+    } catch (err) {
+        console.warn('profileNotificationItem failed:', err.message || err, n);
+        return `
+            <div class="profile-notification-item" data-notification-id="${Number(n?.id || 0)}">
+                <div class="profile-notification-top">
+                    <div class="profile-notification-title">${escHtml(n?.title || 'Update')}</div>
+                    <div class="profile-notification-actions">
+                        <button type="button" class="profile-delete-btn" aria-label="Delete notification" onclick="event.stopPropagation();deleteProfileNotification(${Number(n?.id || 0)})">×</button>
+                    </div>
+                </div>
+                ${n?.message ? `<div class="profile-notification-msg">${escHtml(n.message)}</div>` : ''}
+                <div class="profile-notification-meta">Notification loaded safely</div>
+            </div>
+        `;
+    }
+}
+
 function profileNotificationItem(n) {
     const points = Number(n.points_delta || 0);
+    const sourceType = String(n.source_type || 'site');
+    const sourceId = n.source_id == null ? '' : String(n.source_id);
+    const canOpen = canOpenProfileNotification(n);
+    const notificationId = Number(n.id || 0);
+    const openAttr = canOpen
+        ? ` role="button" tabindex="0" onclick="openProfileNotification(${notificationId},'${escAttr(sourceType)}','${escAttr(sourceId)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openProfileNotification(${notificationId},'${escAttr(sourceType)}','${escAttr(sourceId)}')}"`
+        : '';
+
     return `
-        <div class="profile-notification-item" data-notification-id="${Number(n.id)}" style="${n.is_read ? '' : 'border-color:var(--b3);'}">
+        <div class="profile-notification-item ${canOpen ? 'profile-notification-item--openable' : ''}" data-notification-id="${notificationId}" style="${n.is_read ? '' : 'border-color:var(--b3);'}"${openAttr}>
             <div class="profile-notification-top">
                 <div class="profile-notification-title">${escHtml(n.title || 'Update')}</div>
                 <div class="profile-notification-actions">
                     ${points ? `<div class="profile-xp-delta">${points > 0 ? '+' : ''}${points} Aura</div>` : ''}
-                    <button type="button" class="profile-delete-btn" aria-label="Delete notification" onclick="deleteProfileNotification(${Number(n.id)})">×</button>
+                    ${canOpen ? `<div class="profile-open-hint">Open</div>` : ''}
+                    <button type="button" class="profile-delete-btn" aria-label="Delete notification" onclick="event.stopPropagation();deleteProfileNotification(${notificationId})">×</button>
                 </div>
             </div>
             ${n.message ? `<div class="profile-notification-msg">${escHtml(n.message)}</div>` : ''}
@@ -4170,6 +4604,225 @@ function profileNotificationItem(n) {
         </div>
     `;
 }
+
+function canOpenProfileNotification(n) {
+    if (!n) return false;
+    const type = String(n.source_type || '').toLowerCase();
+    const sourceId = n.source_id == null ? '' : String(n.source_id);
+    if (!sourceId) return false;
+    return [
+        'community_faculty',
+        'community_faculty_request',
+        'community_faculty_watch',
+        'community_faculty_milestone',
+        'community_review',
+        'faculty',
+        'archive_faculty',
+        'student_review',
+        'legacy_review'
+    ].includes(type);
+}
+
+function canOpenNotificationTarget(sourceType, sourceId) {
+    return canOpenProfileNotification({ source_type: sourceType, source_id: sourceId });
+}
+
+async function openProfileNotification(notificationId, fallbackSourceType = '', fallbackSourceId = '') {
+    const id = Number(notificationId || 0);
+    const { email, username } = getCurrentEmailAndUsername();
+
+    closeSheet(document.getElementById('profileBackdrop'));
+
+    setTimeout(async () => {
+        try {
+            let resolved = null;
+
+            if (id && username && email) {
+                const { data, error } = await _supabase.rpc('resolve_my_notification_target', {
+                    p_username: username,
+                    p_full_email: email,
+                    p_notification_id: id
+                });
+                if (!error && data && data.ok) {
+                    resolved = data;
+                } else if (error) {
+                    console.warn('resolve_my_notification_target:', error.message || error);
+                }
+            }
+
+            if (resolved) {
+                await openResolvedNotificationTarget(resolved);
+                refreshProfileChipOnly?.();
+                return;
+            }
+
+            await openNotificationTarget(fallbackSourceType, fallbackSourceId);
+        } catch (err) {
+            console.warn('openProfileNotification:', err.message || err);
+            showToast('Notification target is not available yet.', 'error');
+        }
+    }, 220);
+}
+
+async function openResolvedNotificationTarget(target) {
+    const type = String(target.target_type || '').toLowerCase();
+
+    if (type === 'community') {
+        const pageId = Number(target.community_faculty_id || target.target_id || 0);
+        const reviewId = Number(target.review_id || 0);
+        if (!pageId) throw new Error('Missing community page target');
+        await openCommunityFacultyById(pageId);
+        if (reviewId) highlightCommunityReviewCard(reviewId);
+        return;
+    }
+
+    if (type === 'archive') {
+        const facultyId = Number(target.archive_faculty_id || target.faculty_id || target.target_id || 0);
+        const reviewId = Number(target.review_id || 0);
+        const legacyReviewId = Number(target.legacy_review_id || 0);
+        if (!facultyId) throw new Error('Missing archive faculty target');
+        await openArchiveFacultyById(facultyId);
+        if (reviewId || legacyReviewId) highlightDeepLinkedReview(reviewId || null, legacyReviewId || null);
+        return;
+    }
+
+    if (type === 'search') {
+        const q = String(target.search_query || target.query || '').trim();
+        if (!q) throw new Error('Missing search target');
+        searchInput.value = q;
+        await handleFacultySearch(q, false);
+        return;
+    }
+
+    throw new Error('Unsupported notification target');
+}
+
+async function openNotificationTarget(sourceType, sourceId) {
+    const type = String(sourceType || '').toLowerCase();
+    const id = Number(sourceId);
+    if (!id) throw new Error('Missing notification source id');
+
+    if (type === 'community_faculty' || type === 'community_faculty_request' || type === 'community_faculty_watch' || type === 'community_faculty_milestone') {
+        await openCommunityFacultyById(id);
+        return;
+    }
+
+    if (type === 'community_review') {
+        await openCommunityReviewById(id);
+        return;
+    }
+
+    if (type === 'faculty' || type === 'archive_faculty') {
+        await openArchiveFacultyById(id);
+        return;
+    }
+
+    if (type === 'student_review' || type === 'legacy_review') {
+        await openLegacyReviewById(id);
+        return;
+    }
+
+    throw new Error('Unsupported notification source');
+}
+
+async function openArchiveFacultyById(facultyId) {
+    let f = allFaculty.find(x => Number(x.id) === Number(facultyId));
+    if (!f) {
+        const { data, error } = await _supabase
+            .from('faculty_reviews')
+            .select('*')
+            .eq('id', Number(facultyId))
+            .maybeSingle();
+        if (error) throw error;
+        f = data;
+        if (f && !allFaculty.some(x => Number(x.id) === Number(f.id))) allFaculty.push(f);
+    }
+    if (!f) throw new Error('Archive faculty not found');
+    await displayFaculty(f, false);
+}
+
+async function openCommunityFacultyById(pageId) {
+    let f = allCommunityFaculty.find(x => Number(x.id) === Number(pageId));
+    if (!f) {
+        const sources = ['community_faculty_profiles_public', 'community_faculty_profiles'];
+        for (const source of sources) {
+            try {
+                const { data, error } = await _supabase
+                    .from(source)
+                    .select('*')
+                    .eq('id', Number(pageId))
+                    .maybeSingle();
+                if (error) throw error;
+                if (data) {
+                    f = data;
+                    break;
+                }
+            } catch (err) {
+                console.warn('openCommunityFacultyById ' + source + ':', err.message || err);
+            }
+        }
+    }
+    if (!f) throw new Error('Community page not found');
+    if (!allCommunityFaculty.some(x => Number(x.id) === Number(f.id))) allCommunityFaculty.push(f);
+    await displayCommunityFaculty(f, false);
+}
+
+async function openCommunityReviewById(reviewId) {
+    const data = await fetchCommunityReviewById(reviewId);
+    if (!data) throw new Error('Review not found');
+
+    if (data.target_type === 'archive') {
+        await openArchiveFacultyById(Number(data.archive_faculty_id));
+    } else {
+        await openCommunityFacultyById(Number(data.community_faculty_id));
+    }
+
+    highlightCommunityReviewCard(Number(reviewId));
+}
+
+async function fetchCommunityReviewById(reviewId) {
+    const sources = ['community_faculty_reviews_public', 'community_faculty_reviews'];
+    for (const source of sources) {
+        try {
+            const { data, error } = await _supabase
+                .from(source)
+                .select('*')
+                .eq('id', Number(reviewId))
+                .maybeSingle();
+            if (error) throw error;
+            if (data) return data;
+        } catch (err) {
+            console.warn('fetchCommunityReviewById ' + source + ':', err.message || err);
+        }
+    }
+    return null;
+}
+
+async function openLegacyReviewById(reviewId) {
+    const { data, error } = await _supabase
+        .from('student_reviews')
+        .select('id, faculty_id')
+        .eq('id', Number(reviewId))
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('Legacy review not found');
+    await openArchiveFacultyById(Number(data.faculty_id));
+    highlightDeepLinkedReview(null, Number(reviewId));
+}
+
+function highlightCommunityReviewCard(reviewId) {
+    setTimeout(() => {
+        const id = Number(reviewId);
+        const el = document.getElementById(`community-review-${id}`) || document.querySelector(`[data-community-review-id="${id}"]`);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('review-card--targeted');
+        setTimeout(() => el.classList.remove('review-card--targeted'), 3200);
+    }, 750);
+}
+
+window.openProfileNotification = openProfileNotification;
+window.openNotificationTarget = openNotificationTarget;
 
 async function deleteProfileNotification(notificationId) {
     const { email, username } = getCurrentEmailAndUsername();
@@ -4418,7 +5071,7 @@ function buildCommunityReviewCard(r) {
     const myReaction = myCommunityReviewReactions[Number(r.id)] || '';
 
     return `
-        <div class="review-card" style="--review-accent:${accent}" data-community-review-id="${Number(r.id)}">
+        <div class="review-card" id="community-review-${Number(r.id)}" style="--review-accent:${accent}" data-community-review-id="${Number(r.id)}" data-review-id="${Number(r.id)}">
             <div class="review-meta">
                 <span>${escHtml(reviewer)}</span>
                 ${r.course_code ? `<span class="review-course-chip">${escHtml(r.course_code)}</span>` : ''}
@@ -4430,9 +5083,9 @@ function buildCommunityReviewCard(r) {
                 ${reviewBar('Marking', m)}
                 ${reviewBar('Behavior', b)}
             </div>
+            ${personal ? `<div class="personal-note personal-note--featured"><span>Student-written experience</span><p>“${escHtml(personal)}”</p></div>` : ''}
             ${r.generated_summary ? `<p class="review-text generated">${escHtml(r.generated_summary)}</p>` : ''}
             ${shownTagItems.length ? `<div class="structured-tags structured-tags--proof">${shownTagItems.map(x => `<span class="structured-tag structured-tag--${escHtml(x.mood)}">${escHtml(x.label)}</span>`).join('')}</div>` : ''}
-            ${personal ? `<div class="personal-note">"${escHtml(personal)}"</div>` : ''}
             <div class="review-reaction-row">
                 <div class="review-signal-pill">
                     ${reviewReactionButton(r.id, 'helpful', 'Agree', r.helpful_count, myReaction)}
@@ -4502,7 +5155,7 @@ async function handleCommunityReviewReaction(reviewId, reactionType) {
         } else if (reactionType === 'not_useful') {
             showToast('Feedback saved.', 'success');
         } else {
-            showToast('Report recorded.', 'success');
+            showToast('Report recorded. I can review it from Supabase.', 'success');
         }
 
         refreshProfileChipOnly();
