@@ -59,3 +59,93 @@ button{cursor:pointer}
 .feed-item.static-card{cursor:default}
 .feed-item.static-card:hover{transform:none}
 .notification-muted{font-size:11px;color:var(--t3);line-height:1.45;margin-top:7px}
+
+/* v0.5.5 — notification read-control polish */
+.notification-summary-strip{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
+    margin:2px 0 12px;
+}
+.notification-summary-strip div{
+    border:1px solid var(--b1);
+    border-radius:14px;
+    background:rgba(255,255,255,.045);
+    padding:10px 8px;
+    text-align:center;
+}
+.notification-summary-strip strong{
+    display:block;
+    font-size:18px;
+    font-weight:950;
+    letter-spacing:-.045em;
+    color:var(--t1);
+    line-height:1;
+}
+.notification-summary-strip span{
+    display:block;
+    margin-top:5px;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.55px;
+    text-transform:uppercase;
+    color:var(--t3);
+}
+.notification-summary-strip.detail-strip{
+    margin-bottom:14px;
+}
+.section-mini-label{
+    padding:11px 4px 8px;
+    color:var(--t3);
+    font-size:10px;
+    font-weight:950;
+    letter-spacing:.8px;
+    text-transform:uppercase;
+}
+.feed-item.is-unread,
+.event-card.is-unread{
+    border-color:rgba(255,69,58,.23);
+    background:rgba(255,69,58,.045);
+}
+.feed-item.is-read,
+.event-card.is-read{
+    border-color:rgba(48,209,88,.13);
+}
+.subtle-line{
+    color:var(--t3)!important;
+    font-size:11px!important;
+    margin-top:5px;
+}
+.read-meter{
+    height:6px;
+    border-radius:999px;
+    overflow:hidden;
+    background:rgba(255,255,255,.08);
+    margin:8px 0 9px;
+}
+.read-meter span{
+    display:block;
+    height:100%;
+    border-radius:999px;
+    background:linear-gradient(90deg,var(--purple),var(--blue));
+}
+.mini-user-line{
+    margin-top:7px;
+    color:var(--t2);
+    font-size:11px;
+    line-height:1.45;
+    word-break:break-word;
+}
+.mini-user-line span{
+    color:var(--green);
+    font-weight:900;
+}
+.mini-user-line--unread span{
+    color:var(--red);
+}
+.notification-audit-card .feed-title{
+    line-height:1.35;
+}
+@media(max-width:520px){
+    .notification-summary-strip{grid-template-columns:repeat(2,1fr)}
+}

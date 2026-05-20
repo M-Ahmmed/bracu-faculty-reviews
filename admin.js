@@ -229,24 +229,68 @@ function renderNotificationPulse(payload = {}) {
     const stats = payload.stats || {};
     const items = payload.recent_notifications || [];
     const watches = payload.top_watches || [];
-    const countLabel = `${num(stats.unread || 0)} unread · ${num(stats.review_requests || 0)} requests`;
+    const audit = payload.read_audit || [];
+
+    const total = Number(stats.notifications || 0);
+    const read = Number(stats.read || 0);
+    const unread = Number(stats.unread || 0);
+    const readRate = total ? Math.round((read / total) * 100) : 0;
+    const countLabel = `${num(read)} read · ${num(unread)} unread`;
     if (els.notificationCount) els.notificationCount.textContent = countLabel;
 
-    if (!items.length && !watches.length) {
+    if (!items.length && !watches.length && !audit.length) {
         els.notificationList.innerHTML = '<div class="empty-list">No notification activity in this range yet.</div>';
         return;
     }
 
-    const notificationHtml = items.slice(0, 6).map(n => `
-        <div class="feed-item static-card">
-            <div class="feed-top">
-                <div class="feed-title">${escHtml(n.title || 'Notification')} ${n.source_type ? badge(labelize(n.source_type), 'purple') : ''}</div>
-                <div class="feed-time">${formatTime(n.created_at)}</div>
-            </div>
-            <div class="feed-sub"><strong>${escHtml(n.username || 'unknown')}</strong> ${n.points_delta ? `· ${n.points_delta > 0 ? '+' : ''}${num(n.points_delta)} Aura` : ''}</div>
-            ${n.message ? `<div class="notification-muted">${escHtml(n.message)}</div>` : ''}
+    const summaryHtml = `
+        <div class="notification-summary-strip">
+            <div><strong>${num(total)}</strong><span>sent</span></div>
+            <div><strong>${num(read)}</strong><span>read</span></div>
+            <div><strong>${num(unread)}</strong><span>unread</span></div>
+            <div><strong>${readRate}%</strong><span>read rate</span></div>
         </div>
-    `).join('');
+    `;
+
+    const notificationHtml = items.slice(0, 8).map(n => {
+        const isRead = !!n.is_read;
+        return `
+            <div class="feed-item static-card ${isRead ? 'is-read' : 'is-unread'}">
+                <div class="feed-top">
+                    <div class="feed-title">
+                        ${escHtml(n.title || 'Notification')}
+                        ${badge(isRead ? 'read' : 'unread', isRead ? 'green' : 'red')}
+                        ${n.source_type ? badge(labelize(n.source_type), 'purple') : ''}
+                    </div>
+                    <div class="feed-time">${formatTime(n.created_at)}</div>
+                </div>
+                <div class="feed-sub"><strong>${escHtml(n.username || 'unknown')}</strong> ${n.points_delta ? `· ${n.points_delta > 0 ? '+' : ''}${num(n.points_delta)} Aura` : ''}</div>
+                ${n.read_at ? `<div class="feed-sub subtle-line">Read ${formatTime(n.read_at)}</div>` : ''}
+                ${n.message ? `<div class="notification-muted">${escHtml(n.message)}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const auditHtml = audit.slice(0, 5).map(a => {
+        const sent = Number(a.total_sent || 0);
+        const read = Number(a.total_read || 0);
+        const unread = Number(a.total_unread || 0);
+        const pct = sent ? Math.round((read / sent) * 100) : 0;
+        const readUsers = Array.isArray(a.read_users) ? a.read_users : [];
+        const unreadUsers = Array.isArray(a.unread_users) ? a.unread_users : [];
+        return `
+            <div class="feed-item static-card notification-audit-card">
+                <div class="feed-top">
+                    <div class="feed-title">${escHtml(a.title || 'Notification')} ${a.source_type ? badge(labelize(a.source_type), 'purple') : ''}</div>
+                    <div class="feed-time">${pct}% read</div>
+                </div>
+                <div class="read-meter" aria-hidden="true"><span style="width:${Math.max(0, Math.min(100, pct))}%"></span></div>
+                <div class="feed-sub">${num(sent)} sent · ${num(read)} read · ${num(unread)} unread</div>
+                ${readUsers.length ? `<div class="mini-user-line"><span>Read:</span> ${readUsers.slice(0, 6).map(escHtml).join(', ')}</div>` : ''}
+                ${unreadUsers.length ? `<div class="mini-user-line mini-user-line--unread"><span>Unread:</span> ${unreadUsers.slice(0, 6).map(escHtml).join(', ')}</div>` : ''}
+            </div>
+        `;
+    }).join('');
 
     const watchHtml = watches.slice(0, 4).map(w => `
         <div class="feed-item static-card">
@@ -258,7 +302,11 @@ function renderNotificationPulse(payload = {}) {
         </div>
     `).join('');
 
-    els.notificationList.innerHTML = notificationHtml + (watchHtml ? `<div class="empty-list" style="padding:10px 4px 8px;">Top watches</div>${watchHtml}` : '');
+    els.notificationList.innerHTML =
+        summaryHtml +
+        (notificationHtml ? `<div class="section-mini-label">Recent notifications</div>${notificationHtml}` : '') +
+        (auditHtml ? `<div class="section-mini-label">Read audit</div>${auditHtml}` : '') +
+        (watchHtml ? `<div class="section-mini-label">Top watches</div>${watchHtml}` : '');
 }
 
 function renderFeedback(items) {
@@ -506,6 +554,11 @@ function renderOverview(data, rank) {
     const p = data.profile || {};
     const r = data.range_stats || {};
     const l = data.lifetime || {};
+    const notifications = data.notifications || [];
+    const totalNotifications = notifications.length;
+    const readNotifications = notifications.filter(n => !!n.is_read).length;
+    const unreadNotifications = totalNotifications - readNotifications;
+    const readRate = totalNotifications ? Math.round((readNotifications / totalNotifications) * 100) + '%' : '—';
     els.tabOverview.innerHTML = `
         <div class="grid-2">
             ${overviewCard('Identity', `
@@ -531,6 +584,12 @@ function renderOverview(data, rank) {
                 ${line('Disagrees received', num(l.not_useful_received))}
                 ${line('Reports received', num(l.reports_received))}
                 ${line('Range failed searches', num(r.failed_searches))}
+            `)}
+            ${overviewCard('Notifications', `
+                ${line('Total in range', num(totalNotifications))}
+                ${line('Read', num(readNotifications))}
+                ${line('Unread', num(unreadNotifications))}
+                ${line('Read rate', readRate)}
             `)}
         </div>
     `;
@@ -604,12 +663,44 @@ function renderReactions(made, received) {
 
 function renderNotifications(items) {
     if (!items.length) return els.tabNotifications.innerHTML = '<div class="empty-list">No notifications in this range.</div>';
-    els.tabNotifications.innerHTML = items.map(n => `
-        <div class="event-card">
-            <div class="event-head"><div class="event-title">${escHtml(n.title || 'Notification')} ${n.points_delta ? badge(`${Number(n.points_delta) > 0 ? '+' : ''}${n.points_delta} Aura`, 'purple') : ''}</div><div class="event-time">${formatTime(n.created_at)}</div></div>
-            <div class="event-sub">${escHtml(n.message || '')}</div>
+
+    const total = items.length;
+    const read = items.filter(n => !!n.is_read).length;
+    const unread = total - read;
+    const readRate = total ? Math.round((read / total) * 100) : 0;
+
+    const summary = `
+        <div class="notification-summary-strip detail-strip">
+            <div><strong>${num(total)}</strong><span>total</span></div>
+            <div><strong>${num(read)}</strong><span>read</span></div>
+            <div><strong>${num(unread)}</strong><span>unread</span></div>
+            <div><strong>${readRate}%</strong><span>read rate</span></div>
         </div>
-    `).join('');
+    `;
+
+    const cards = items.map(n => {
+        const isRead = !!n.is_read;
+        return `
+            <div class="event-card ${isRead ? 'is-read' : 'is-unread'}">
+                <div class="event-head">
+                    <div class="event-title">
+                        ${escHtml(n.title || 'Notification')}
+                        ${badge(isRead ? 'read' : 'unread', isRead ? 'green' : 'red')}
+                        ${n.points_delta ? badge(`${Number(n.points_delta) > 0 ? '+' : ''}${n.points_delta} Aura`, 'purple') : ''}
+                        ${n.source_type ? badge(labelize(n.source_type), 'blue') : ''}
+                    </div>
+                    <div class="event-time">${formatTime(n.created_at)}</div>
+                </div>
+                <div class="event-sub">${escHtml(n.message || '')}</div>
+                <div class="event-sub subtle-line">
+                    ${isRead ? `Read${n.read_at ? ' · ' + formatTime(n.read_at) : ''}` : 'Unread'}
+                    ${n.source_id ? ` · Target ${escHtml(n.source_id)}` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    els.tabNotifications.innerHTML = summary + cards;
 }
 
 function renderVotes(items) {
